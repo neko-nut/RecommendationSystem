@@ -16,14 +16,15 @@ class Asset(Base):
     revision = Column(INT)
     asset_id = Column(INT, primary_key=True)
     asset_user = Column(INT)
-    asset_agent = Column(INT)
-    asset_inspector = Column(INT)
+    asset_agent = Column(JSON)
+    asset_inspector = Column(JSON)
     asset_title = Column(Text)
     asset_location = Column(JSON)
     asset_info = Column(JSON)
     asset_open = Column(DATETIME)
     asset_close = Column(DATETIME)
     asset_status = Column(INT)
+    asset_type = Column(INT)
 
 
 class User(Base):

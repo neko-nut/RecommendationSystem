@@ -7,3 +7,4 @@ class Config(object):
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     Data = os.path.join(basedir, 'static/housedata.csv')
+    stopwords = os.path.join(basedir, 'static/stopwords.txt')
