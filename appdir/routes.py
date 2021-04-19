@@ -474,6 +474,10 @@ def add():
     for i in df.index:
         version = 1
         id = j
+        user = random.randint(1, 995)
+        agent = []
+        inspector = []
+        type = random.randint(1, 2)
         j = j + 1
         location = {
             'type': "FeatureCollection",
@@ -494,25 +498,23 @@ def add():
                 }
             ]
         }
-        info = {
-            'bathroom': int(df.loc[i, 'bathroom']),
-            'room': int(df.loc[i, 'bedroom']),
-            'area': int(df.loc[i, 'size']),
-            'year_built': int(df.loc[i, 'year']),
-            'price': int(df.loc[i, 'price']),
-            'garage': int(df.loc[i, 'garage'])
-        }
-
+        info = {'bathroom': int(df.loc[i, 'bathroom']),
+                'room': int(df.loc[i, 'bedroom']),
+                'area': int(df.loc[i, 'size']),
+                'year_built': int(df.loc[i, 'year']),
+                'price': int(df.loc[i, 'price']),
+                'garage': int(df.loc[i, 'garage']),
+                'type': random.randint(1, 6)
+                }
         if i < 5000:
-            info['type'] = 1
             title = 'house'
             if i < 1234:
                 title = 'a second hand ' + title
         else:
-            info['type'] = 0
             title = 'apartment'
             if i < 7654:
                 title = 'a new ' + title
+
         info['details'] = ''
         if df.loc[i, 'garage'] > 0:
             title = title + ' with ' + str(int(df.loc[i, 'garage'])) + ' garden'
