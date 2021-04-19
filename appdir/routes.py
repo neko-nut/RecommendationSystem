@@ -4,6 +4,7 @@ import math
 import re
 import time
 from math import sqrt
+import random
 
 import pandas as pd
 from flask import request, jsonify
@@ -57,6 +58,7 @@ assets_all = []
 assets_now = []
 popularity = {}
 popularity_user = {}
+popularity_value = {}
 
 area_min = 2147483647
 area_max = 0
@@ -173,7 +175,7 @@ def getasset():
         if 'street' in asset.asset_location['features'][0]['properties']:
             dic['street'] = asset.asset_location['features'][0]['properties']['street']
 
-        dic['type'] = 6
+        dic['type'] = 7
         dic['area'] = 0
         dic['price'] = 0
         dic['room'] = 0
@@ -221,7 +223,7 @@ def getasset():
             dic['title'] = []
             if 'details' in asset.asset_info:
                 words = asset.asset_info['details'].lower().split()
-                words = re.split('[^a-z0-9]', str(words))
+                words = re.split('[^a-z]', str(words))
                 words = [x for x in words if x != '']
                 len_sum = len_sum + len(words)
                 doclen[asset] = len(words)
@@ -271,22 +273,21 @@ def getfavorite():
 
 @application.route('/getpopularity')
 def getpopularity():
+    global popularity_value
     pop_nom = minmax(popularity)
     act_nom = minmax(actions)
-    result = {}
     for asset in assets_now:
         p = 0
         a = 0
         if asset['id'] in pop_nom:
-            p = pop_nom[asset['id']] + 0.01
+            p = (pop_nom[asset['id']] + 0.01) * 3
         if asset['id'] in act_nom:
-            a = (act_nom[asset['id']] + 0.01) * 3
-        result[asset['id']] = p + a
-    res_sort = sorted(result, key=result.get, reverse=True)
+            a = act_nom[asset['id']] + 0.01
+        popularity_value[asset['id']] = p + a
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": res_sort
+        "data": popularity_value
     })
 
 
@@ -307,6 +308,12 @@ def minmax(dic):
     return dic
 
 
+def get_user_matrix():
+    matrix = {}
+
+    return matrix
+
+
 @application.route('/retrieval', methods=['GET', 'POST'])
 def retrieval():
     result = {}
@@ -315,14 +322,14 @@ def retrieval():
     location = None
     info = None
     if request.method == "POST":
-        user = request.form.get('user')
+        user = int(request.form.get('user'))
         location = json.loads(request.form.get('location'))
         info = json.loads(request.form.get('info'))
 
     # analysis details
+    query = []
     if info is not None:
         if len(info['details']) > 0:
-            index = []
             info['details'] = info['details'].strip().lower()
             info['details'] = re.split('[^a-z|0-9]', str(info['details']))
             info['details'] = [x for x in info['details'] if x != '']
@@ -331,71 +338,87 @@ def retrieval():
                     if w not in cache:
                         cache[w] = p.stem(w)
                     w = cache[w]
-                    index.append(w)
-
+                    query.append(w)
+    dis_max = 0
+    dis_min = 2147483647
+    det_max = 0
     for asset in assets_now:
         if location['subregion'] == asset['subregion']:
             result[asset['id']] = {}
 
             # calculate the z score for distance
-            dis_sum = 0
             result[asset['id']]['distance'] = sqrt(pow((location['longitude'] - asset['longitude']), 2) +
                                                    pow((location['latitude'] - asset['latitude']), 2))
-            dis_sum = dis_sum + result[asset['id']]['distance']
+
+            if result[asset['id']]['distance'] > dis_max:
+                dis_max = result[asset['id']]['distance']
+            if result[asset['id']]['distance'] < dis_min:
+                dis_min = result[asset['id']]['distance']
 
             # matching degree
             result[asset['id']]['match'] = 0
             if len(location['subregion']) > 0:
-                if location['subregion'] != asset['subregion']:
+                if location['subregion'] == asset['subregion']:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
             if len(location['street']) > 0:
-                if location['street'] != asset['street']:
+                if location['street'] == asset['street']:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
 
             if info is not None:
                 # matching degree
-                if info['type'] != 6:
-                    if info['type'] != asset.info['type']:
-                        result[asset['id']]['match'] = result[asset['id']]['match'] + 1
+                if info['type'] == 7 or info['type'] == asset['type']:
+                    result[asset['id']]['match'] = result[asset['id']]['match'] + 1
 
                 if info['area'][1] > area_max:
                     info['area'][1] = area_max
                 elif info['area'][0] < area_min:
                     info['area'][0] = area_min
-                if asset['area'] > info['area'][1] or asset['area'] < info['area'][0]:
+                if info['area'][1] > asset['area'] > info['area'][0]:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
 
                 if info['price'][1] > price_max:
                     info['price'][1] = price_max
                 elif info['price'][0] < price_min:
                     info['price'][0] = price_min
-                if asset['price'] > info['price'][1] or asset['price'] < info['price'][0]:
+                if info['price'][1] > asset['price'] > info['price'][0]:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
 
                 if info['year'][1] > year_max:
                     info['year'][1] = year_max
                 elif info['year'][0] < year_min:
                     info['year'][0] = year_min
-                if asset['year'] > info['year'][1] or asset['year'] < info['year'][0]:
+                if info['year'][1] > asset['year'] > info['year'][0]:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
 
-                if info['room'] < info['room']:
+                if asset['room'] > info['room']:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
-                if info['bathroom'] < info['bathroom']:
+                if asset['bathroom'] > info['bathroom']:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
-                if info['garage'] < info['garage']:
+                if asset['garage'] > info['garage']:
                     result[asset['id']]['match'] = result[asset['id']]['match'] + 1
-
-                if len(info['details']) > 0:
-                    res = 0
-                    for q in index:
+                res = 0
+                if len(asset['details']) > 0:
+                    print(asset['details'])
+                    for q in query:
                         if q in asset['details']:
                             res = res + asset['details'][q]
-                    result[asset['id']]['details'] = res
-                print(result[asset['id']])
-
-    # if user == -1:
-    #     ## TODO
+                if len(asset['title']) > 0:
+                    print(asset['title'])
+                    for q in query:
+                        if q in asset['title']:
+                            res = res + (asset['title'][q]) * 2
+                if res > det_max:
+                    det_max = res
+                result[asset['id']]['details'] = res
+    if user == -1:
+        print('1111')
+        sort = sorted(popularity_value, key=popularity_value.get, reverse=True)
+        for i in result:
+            result[i]["distance"] = 1 - ((result[i]["distance"] - dis_min) / (dis_max - dis_min))
+            result[i]['match'] = result[i]["match"] / 7
+            result[i]['details'] = result[i]['details'] / det_max
+            result[i]['pop'] = popularity_value[i] / popularity_value[sort[0]]
+        print(result)
 
     return "success"
 
@@ -498,7 +521,16 @@ def add():
         if df.loc[i, 'yard'] > 0:
             info['details'] = info['details'] + 'have a ' + str(df.loc[i, 'yard']) + 'square feet yard '
         session.add(
-            Asset(revision=version, asset_id=id, asset_title=title, asset_location=location, asset_info=info,
-                  asset_open=datetime.datetime.now(), asset_status=1))
+            Asset(revision=version,
+                  asset_id=id,
+                  asset_user=user,
+                  asset_agent=agent,
+                  asset_inspector=inspector,
+                  asset_title=title,
+                  asset_location=location,
+                  asset_info=info,
+                  asset_open=datetime.datetime.now(),
+                  asset_status=1,
+                  asset_type=type))
     session.commit()
     return "success"
