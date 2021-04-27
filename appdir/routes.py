@@ -45,11 +45,37 @@ server1 = SSHTunnelForwarder(
     remote_bind_address=('127.0.0.1', 8086)
 )
 server1.start()
-
 client = InfluxDBClient('127.0.0.1', str(server1.local_bind_port), 'root', 'root', 'apex')
 
 with open(Config.stopwords, 'r') as f:
     stopwords = set(f.read().split())
+
+zip_code = {}
+state = {}
+with open(Config.zip, 'r') as f:
+    line = f.readline()
+    while len(line) > 0:
+        line = re.split("[^a-z|A-Z|0-9| ]", str(line))
+        line = [x for x in line if x != '']
+        line = [x for x in line if x != ' ']
+        state[line[4]] = line[3]
+        line = f.readline()
+    state['PR'] = 'Puerto Rico'
+    state['VI'] = 'Virgin Islands'
+    state['AE'] = 'Armed Forces – Europe'
+    state['AA'] = 'Armed Forces – Americas'
+    state['AP'] = 'Armed Forces – Pacific'
+    state['AS'] = 'American Samoa'
+    print(len(state))
+
+with open(Config.zips, 'r') as load_f:
+    load_dict = json.load(load_f)
+    # print(load_dict)
+    for zip in load_dict:
+        if zip['country'] == "US":
+            zip_code[zip['zip_code']] = {"country": zip['country'].split('[^a-z|A-Z| ]')[0], "subregion": zip['city'].split('[^a-z|A-Z| ]')[0], 'region': state[zip['state']].split('[^a-z|A-Z| ]')[0]}
+    print(zip_code)
+
 
 actions = {}
 actions_user = {}
@@ -75,10 +101,8 @@ n = {}
 def init():
     getaction()
     getasset()
-    getfavorite()
+    getuserinfo()
     getpopularity()
-    print(assets_now[13226])
-    print(assets_all[90])
     return jsonify({
         "code": 200,
         "msg": "OK"
@@ -681,19 +705,20 @@ def add():
             'type': "FeatureCollection",
             'features': [
                 {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        'coordinates': [df.loc[i, 'longitude'] / 10000000, df.loc[i, 'latitude'] / 10000000],
-                    },
-                    "properties": {
-                        "name": "New York",
-                        "description": 'New York',
-                        'region': str(int(df.loc[i, 'county'])),
-                        'subregion': str(int(df.loc[i, 'city'])),
-                        'street': ''
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "Point",
+                            'coordinates': [df.loc[i, 'longitude'] / 1000000, df.loc[i, 'latitude'] / 1000000],
+                        },
+                        "properties": {
+                            "name": "New York",
+                            "description": 'New York',
+                            'country': 'America',
+                            'region': zip_code[str(int(df.loc[i, 'zip']))]['region'].strip(),
+                            'subregion': zip_code[str(int(df.loc[i, 'zip']))]['subregion'].strip(),
+                            'street': ''
+                        }
                     }
-                }
             ]
         }
         info = {'bathroom': int(df.loc[i, 'bathroom']),
@@ -729,8 +754,12 @@ def add():
                   asset_title=title,
                   asset_location=location,
                   asset_info=info,
-                  asset_open=datetime.datetime.now(),
-                  asset_status=1,
-                  asset_type=type))
+                      asset_open=datetime.datetime.now(),
+                      asset_status=1,
+                      asset_type=type))
+            # print(id, location)
+    print(s)
+    print(z)
+    print(zz)
     session.commit()
     return "success"

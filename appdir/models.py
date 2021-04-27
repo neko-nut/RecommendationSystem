@@ -42,12 +42,11 @@ class User(Base):
     user_bio = Column(VARCHAR(32))
     user_timeoffset = Column(INT)
     user_freeze = Column(VARCHAR(1))
-    user_is_agent = Column(VARCHAR(1))
-    user_is_inspector = Column(VARCHAR(1))
     user_reg_ip = Column(VARCHAR(128))
     user_reg_datetime = Column(DATETIME)
     user_preference = Column(JSON)
     user_google_token = Column(Text)
     user_avatar = Column(Text)
     user_favorites = Column(JSON)
+    user_role = Column(INT)
 
