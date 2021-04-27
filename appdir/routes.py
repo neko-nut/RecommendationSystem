@@ -85,6 +85,8 @@ assets_now = {}
 popularity = {}
 popularity_user = {}
 popularity_value = {}
+preference = {}
+user_new = set()
 
 area_min = 2147483647
 area_max = 0
@@ -241,6 +243,8 @@ def getasset():
         if 'garage' in asset.asset_info:
             dic['garage'] = int(asset.asset_info['garage'])
 
+        dic['time'] = asset.asset_open
+
         assets_all[asset.asset_id] = dic
 
         if asset.asset_status == 1:
@@ -251,7 +255,7 @@ def getasset():
                 words = re.split('[^a-z]', str(words))
                 words = [x for x in words if x != '']
                 len_sum = len_sum + len(words)
-                doclen[asset] = len(words)
+                doclen[asset.asset_id] = len(words)
                 dic['details'] = wordsanalysis(words)
 
             words = asset.asset_title.lower().split()
@@ -261,16 +265,16 @@ def getasset():
             assets_now[asset.asset_id] = dic
     avg_doclen = len_sum / l
     print('success')
-
+    print(doclen)
     for asset in assets_now:
-        if len(dic['details']) > 0:
-            for t in dic['details']:
-                fi = dic['details'][t]
-                dic['details'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(
+        if len(assets_now[asset]['details']) > 0:
+            for t in assets_now[asset]['details']:
+                fi = assets_now[asset]['details'][t]
+                assets_now[asset]['details'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(
                     ((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
-            for t in dic['title']:
-                fi = dic['title'][t]
-                dic['title'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(
+            for t in assets_now[asset]['title']:
+                fi = assets_now[asset]['title'][t]
+                assets_now[asset]['title'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(
                     ((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
 
     return jsonify({
@@ -279,10 +283,11 @@ def getasset():
     })
 
 
-@application.route('/getfavorite')
-def getfavorite():
+@application.route('/getuserinfo')
+def getuserinfo():
     global popularity
-    global popularity_user
+    global user_new
+    global preference
     users = session.query(User).all()
     for user in users:
         for asset in user.user_favorites:
@@ -290,6 +295,9 @@ def getfavorite():
                 popularity[asset] = 0
             popularity[asset] = popularity[asset] + 1
         popularity_user[user.user_id] = user.user_favorites
+        preference[user.user_id] = user.user_preference
+        if user.user_reg_datetime > datetime.datetime.now() - datetime.timedelta(days=30):
+            user_new.add(user.user_id)
     return jsonify({
         "code": 200,
         "msg": "OK"
@@ -366,7 +374,6 @@ def get_user_matrix():
                         matrix[user]['region'][record['location']['region']] = 0
                     matrix[user]['region'][record['location']['region']] = matrix[user]['region'][
                                                                                record['location']['region']] + 100
-
             if 'info' in record:
                 if 'type' in record['info']:
                     if 'type' not in matrix[user]:
@@ -432,76 +439,20 @@ def get_user_matrix():
         if user not in matrix:
             matrix[user] = {}
         for asset in actions_user[user]:
-            if 'region' not in matrix[user]:
-                matrix[user]['region'] = {}
-            if 'region' in assets_all[asset]:
-                if assets_all[asset]['region'] not in matrix[user]['region']:
-                    matrix[user]['region'][assets_all[asset]['region']] = 0
-                matrix[user]['region'][assets_all[asset]['region']] = matrix[user]['region'][assets_all[asset]['region']] + \
-                                                                  actions_user[user][asset]
+            matrix = getmatrix(matrix, asset, user, actions_user[user][asset], area_sort, price_sort, year_sort, first, second, third, forth)
 
-            if 'type' not in matrix[user]:
-                matrix[user]['type'] = {}
-            if assets_all[asset]['type'] not in matrix[user]['type']:
-                matrix[user]['type'][assets_all[asset]['type']] = 0
-            matrix[user]['type'][assets_all[asset]['type']] = matrix[user]['type'][assets_all[asset]['type']] + \
-                                                              actions_user[user][asset]
+    for user in matrix:
+        for asset in popularity[user]:
+            matrix = getmatrix(matrix, asset, user, 1000, area_sort, price_sort, year_sort, first, second, third, forth)
+        if user not in user_new:
+            matrix = analysispreference(matrix, user, area_sort, price_sort, year_sort, first, second, third, forth)
 
-            area_state = getstate(area_sort, assets_all[asset]['area'], 'area', first, second, third, forth)
-            if 'area' not in matrix[user]:
-                matrix[user]['area'] = {}
-            if area_state not in matrix[user]['area']:
-                matrix[user]['area'][area_state] = 0
-            matrix[user]['area'][area_state] = matrix[user]['area'][area_state] + actions_user[user][asset]
+    for user in user_new:
+        if user not in matrix:
+            matrix[user] = {}
+        matrix = analysispreference(matrix, user, area_sort, price_sort, year_sort, first, second, third, forth)
 
-            price_state = getstate(price_sort, assets_all[asset]['price'], 'price', first, second, third, forth)
-            if 'price' not in matrix[user]:
-                matrix[user]['price'] = {}
-            if price_state not in matrix[user]['price']:
-                matrix[user]['price'][price_state] = 0
-            matrix[user]['price'][price_state] = matrix[user]['price'][price_state] + actions_user[user][asset]
-
-            if 'room' not in matrix[user]:
-                matrix[user]['room'] = {}
-            if assets_all[asset]['room'] not in matrix[user]['room']:
-                matrix[user]['room'][assets_all[asset]['room']] = 0
-            matrix[user]['room'][assets_all[asset]['room']] = matrix[user]['room'][assets_all[asset]['room']] + \
-                                                              actions_user[user][asset]
-            if 'bathroom' not in matrix[user]:
-                matrix[user]['bathroom'] = {}
-            if assets_all[asset]['bathroom'] not in matrix[user]['bathroom']:
-                matrix[user]['bathroom'][assets_all[asset]['bathroom']] = 0
-            matrix[user]['bathroom'][assets_all[asset]['bathroom']] = matrix[user]['bathroom'][assets_all[asset]['bathroom']] + actions_user[user][asset]
-
-            year_state = getstate(year_sort, assets_all[asset]['year'], 'year', first, second, third, forth)
-            if 'year' not in matrix[user]:
-                matrix[user]['year'] = {}
-            if year_state not in matrix[user]['year']:
-                matrix[user]['year'][year_state] = 0
-            print(user, year_state, matrix[user]['year'])
-            matrix[user]['year'][year_state] = matrix[user]['year'][year_state] + actions_user[user][asset]
-
-            if 'garage' not in matrix[user]:
-                matrix[user]['garage'] = {}
-            if assets_all[asset]['garage'] not in matrix[user]['garage']:
-                matrix[user]['garage'][assets_all[asset]['garage']] = 0
-            matrix[user]['garage'][assets_all[asset]['garage']] = matrix[user]['garage'][assets_all[asset]['garage']] + \
-                                                                  actions_user[user][asset]
-
-            if 'description' not in matrix[user]:
-                matrix[user]['description'] = {}
-
-            for words in assets_all[asset]['details']:
-                if words not in matrix[user]['description']:
-                    matrix[user]['description'][words] = 0
-                matrix[user]['description'][words] = matrix[user]['description'][words] + actions_user[user][asset]
-
-            for words in assets_all[asset]['title']:
-                if words not in matrix[user]['description']:
-                    matrix[user]['description'][words] = 0
-                matrix[user]['description'][words] = matrix[user]['description'][words] + actions_user[user][asset] * 2
-        for item in matrix[user]:
-            matrix[user][item] = sorted(matrix[user][item], matrix[user][item].get, reverse=True)[0]
+    
     return matrix
 
 
@@ -517,6 +468,148 @@ def getstate(list, num, attribute, first, second, third, forth):
     else:
         state = 4
     return state
+
+
+def analysispreference(matrix, user, area_sort, price_sort, year_sort, first, second, third, forth):
+    if 'asset_types' in preference[user]:
+        if 'type' not in matrix[user]:
+            matrix[user]['type'] = {}
+        for t in preference[user]['asset_types']:
+            if t not in matrix[user]['type']:
+                matrix[user]['type'][t] = 0
+            matrix[user]['type'][t] = matrix[user]['type'][t] + 100
+
+    if 'location_range' in preference[user]:
+        if 'region' not in matrix[user]:
+            matrix[user]['region'] = {}
+        if preference[user]['location_range'] not in matrix[user]['region']:
+            matrix[user]['region'][preference[user]['location_range']] = 0
+        matrix[user]['region'][preference[user]['location_range']] = matrix[user]['region'][
+                                                                         preference[user]['location_range']] + 100
+
+    if 'area_range' in preference[user]:
+        min = getstate(area_sort, preference[user]['area_range'][0], 'area', first, second, third, forth)
+        max = getstate(area_sort, preference[user]['area_range'][1], 'area', first, second, third, forth)
+        if 'area' not in matrix['user']:
+            matrix[user]['area'] = {}
+        for i in range(min, max):
+            if i not in matrix[user]['area']:
+                matrix[user]['area'][i] = 0
+            matrix[user]['area'][i] = matrix[user]['area'][i] + 100
+
+    if 'price_range' in preference[user]:
+        min = getstate(price_sort, preference[user]['price_range'][0], 'price', first, second, third, forth)
+        max = getstate(price_sort, preference[user]['price_range'][1], 'price', first, second, third, forth)
+        if 'price' not in matrix['user']:
+            matrix[user]['price'] = {}
+        for i in range(min, max):
+            if i not in matrix[user]['price']:
+                matrix[user]['price'][i] = 0
+            matrix[user]['price'][i] = matrix[user]['price'][i] + 100
+
+    if 'room_num_range' in preference[user]:
+        if 'room' not in matrix[user]:
+            matrix[user]['room'] = {}
+        if preference[user]['room_num_range'][0] not in matrix[user]['room']:
+            matrix[user]['room'][preference[user]['room_num_range'][0]] = 0
+        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][
+                                                                          preference[user]['room_num_range'][0]] + 100
+
+    if 'bathroom_num_range' in preference[user]:
+        if 'bathroom' not in matrix[user]:
+            matrix[user]['bathroom'] = {}
+        if preference[user]['bathroom_num_range'][0] not in matrix[user]['bathroom']:
+            matrix[user]['bathroom'][preference[user]['bathroom_num_range'][0]] = 0
+        matrix[user]['bathroom'][preference[user]['bathroom_num_range'][0]] = matrix[user]['bathroom'][preference[user][
+            'bathroom_num_range'][0]] + 100
+
+    if 'built_year_range' in preference[user]:
+        min = getstate(year_sort, preference[user]['built_year_range'][0], 'price', first, second, third, forth)
+        max = getstate(year_sort, preference[user]['built_year_range'][1], 'price', first, second, third, forth)
+        if 'year' not in matrix['user']:
+            matrix[user]['year'] = {}
+        for i in range(min, max):
+            if i not in matrix[user]['year']:
+                matrix[user]['year'][i] = 0
+            matrix[user]['year'][i] = matrix[user]['year'][i] + 100
+
+    if 'garage_num_range' in preference[user]:
+        if 'garage' not in matrix[user]:
+            matrix[user]['garage'] = {}
+        if preference[user]['garage_num_range'][0] not in matrix[user]['garage']:
+            matrix[user]['garage'][preference[user]['garage_num_range'][0]] = 0
+        matrix[user]['garage'][preference[user]['garage_num_range'][0]] = matrix[user]['garage'][
+                                                                              preference[user]['garage_num_range'][
+                                                                                  0]] + 100
+    return matrix
+
+
+def getmatrix(matrix, asset, user, time, area_sort, price_sort, year_sort, first, second, third, forth):
+    if 'region' not in matrix[user]:
+        matrix[user]['region'] = {}
+    if 'region' in assets_all[asset]:
+        if assets_all[asset]['region'] not in matrix[user]['region']:
+            matrix[user]['region'][assets_all[asset]['region']] = 0
+        matrix[user]['region'][assets_all[asset]['region']] = matrix[user]['region'][assets_all[asset]['region']] + time
+
+    if 'type' not in matrix[user]:
+        matrix[user]['type'] = {}
+    if assets_all[asset]['type'] not in matrix[user]['type']:
+        matrix[user]['type'][assets_all[asset]['type']] = 0
+    matrix[user]['type'][assets_all[asset]['type']] = matrix[user]['type'][assets_all[asset]['type']] + time
+
+    area_state = getstate(area_sort, assets_all[asset]['area'], 'area', first, second, third, forth)
+    if 'area' not in matrix[user]:
+        matrix[user]['area'] = {}
+    if area_state not in matrix[user]['area']:
+        matrix[user]['area'][area_state] = 0
+    matrix[user]['area'][area_state] = matrix[user]['area'][area_state] + time
+
+    price_state = getstate(price_sort, assets_all[asset]['price'], 'price', first, second, third, forth)
+    if 'price' not in matrix[user]:
+        matrix[user]['price'] = {}
+    if price_state not in matrix[user]['price']:
+        matrix[user]['price'][price_state] = 0
+    matrix[user]['price'][price_state] = matrix[user]['price'][price_state] + time
+
+    if 'room' not in matrix[user]:
+        matrix[user]['room'] = {}
+    if assets_all[asset]['room'] not in matrix[user]['room']:
+        matrix[user]['room'][assets_all[asset]['room']] = 0
+    matrix[user]['room'][assets_all[asset]['room']] = matrix[user]['room'][assets_all[asset]['room']] + time
+
+    if 'bathroom' not in matrix[user]:
+        matrix[user]['bathroom'] = {}
+    if assets_all[asset]['bathroom'] not in matrix[user]['bathroom']:
+        matrix[user]['bathroom'][assets_all[asset]['bathroom']] = 0
+    matrix[user]['bathroom'][assets_all[asset]['bathroom']] = matrix[user]['bathroom'][assets_all[asset]['bathroom']] + time
+
+    year_state = getstate(year_sort, assets_all[asset]['year'], 'year', first, second, third, forth)
+    if 'year' not in matrix[user]:
+        matrix[user]['year'] = {}
+    if year_state not in matrix[user]['year']:
+        matrix[user]['year'][year_state] = 0
+    print(user, year_state, matrix[user]['year'])
+    matrix[user]['year'][year_state] = matrix[user]['year'][year_state] + time
+
+    if 'garage' not in matrix[user]:
+        matrix[user]['garage'] = {}
+    if assets_all[asset]['garage'] not in matrix[user]['garage']:
+        matrix[user]['garage'][assets_all[asset]['garage']] = 0
+    matrix[user]['garage'][assets_all[asset]['garage']] = matrix[user]['garage'][assets_all[asset]['garage']] + time
+    if 'description' not in matrix[user]:
+        matrix[user]['description'] = {}
+
+    for words in assets_all[asset]['details']:
+        if words not in matrix[user]['description']:
+            matrix[user]['description'][words] = 0
+        matrix[user]['description'][words] = matrix[user]['description'][words] + time
+
+    for words in assets_all[asset]['title']:
+        if words not in matrix[user]['description']:
+            matrix[user]['description'][words] = 0
+        matrix[user]['description'][words] = matrix[user]['description'][words] + time * 2
+    return matrix
 
 
 @application.route('/retrieval', methods=['GET', 'POST'])
@@ -564,11 +657,11 @@ def retrieval():
     dis_max = 0
     dis_min = 2147483647
     det_max = 0
+    time_max = 0
+    time_min = 2147483647
     for asset in assets_now:
         if location['subregion'] == assets_now[asset]['subregion']:
             result[asset] = {}
-
-            # calculate the z score for distance
             result[asset]['distance'] = sqrt(pow((location['longitude'] - assets_now[asset]['longitude']), 2) +
                                              pow((location['latitude'] - assets_now[asset]['latitude']), 2))
 
@@ -632,15 +725,26 @@ def retrieval():
                 if res > det_max:
                     det_max = res
                 result[asset]['details'] = res
+
+            result[asset]['time'] = (datetime.datetime.now() - assets_now[asset]['time']).total_seconds()
+            if result[asset]['time'] > time_max:
+                time_max = result[asset]['time']
+            if result[asset]['time'] < time_min:
+                time_min = result[asset]['time']
+
     if user is None:
         print('1111')
         sort = sorted(popularity_value, key=popularity_value.get, reverse=True)
-        for i in result:
-            result[i]["distance"] = 1 - ((result[i]["distance"] - dis_min) / (dis_max - dis_min))
-            result[i]['match'] = result[i]["match"] / 7
-            result[i]['details'] = result[i]['details'] / det_max
-            result[i]['pop'] = popularity_value[i] / popularity_value[sort[0]]
-        print(result)
+    else:
+        sort = None
+
+    for i in result:
+        result[i]["distance"] = 1 - ((result[i]["distance"] - dis_min) / (dis_max - dis_min))
+        result[i]['match'] = result[i]["match"] / 7
+        result[i]['details'] = result[i]['details'] / det_max
+        result[i]['time'] = 1 - ((result[i]["time"] - time_min) / (time_max - time_min))
+        # result[i]['pop'] = popularity_value[i] / popularity_value[sort[0]]
+        print(result[i]['time'])
 
     return "success"
 
@@ -674,8 +778,7 @@ def add():
         "latitude",
         "longitude",
         "pool",
-        "city",
-        "county",
+        "zip",
         "yard",
         "year",
         "price"
@@ -693,18 +796,25 @@ def add():
     df[f] = df[f].fillna(0)
     df.dropna(axis=0, how='any', thresh=None, subset=None, inplace=True)
     j = 1
+    s = set()
+    z = set()
+    zz = set()
     for i in df.index:
-        version = 1
-        id = j
-        user = random.randint(1, 995)
-        agent = []
-        inspector = []
-        type = random.randint(1, 2)
-        j = j + 1
-        location = {
-            'type': "FeatureCollection",
-            'features': [
-                {
+        zz.add(df.loc[i, 'zip'])
+        if str(int(df.loc[i, 'zip'])) in zip_code:
+            s.add(zip_code[str(int(df.loc[i, 'zip']))]['subregion'])
+            z.add(df.loc[i, 'zip'])
+            version = 1
+            id = j
+            user = random.randint(1, 995)
+            agent = []
+            inspector = []
+            type = random.randint(1, 2)
+            j = j + 1
+            location = {
+                'type': "FeatureCollection",
+                'features': [
+                    {
                         "type": "Feature",
                         "geometry": {
                             "type": "Point",
@@ -719,41 +829,41 @@ def add():
                             'street': ''
                         }
                     }
-            ]
-        }
-        info = {'bathroom': int(df.loc[i, 'bathroom']),
-                'room': int(df.loc[i, 'bedroom']),
-                'area': int(df.loc[i, 'size']),
-                'year_built': int(df.loc[i, 'year']),
-                'price': int(df.loc[i, 'price']),
-                'garage': int(df.loc[i, 'garage']),
-                'type': random.randint(1, 6)
-                }
-        if i < 5000:
-            title = 'house'
-            if i < 1234:
-                title = 'a second hand ' + title
-        else:
-            title = 'apartment'
-            if i < 7654:
-                title = 'a new ' + title
+                ]
+            }
+            info = {'bathroom': int(df.loc[i, 'bathroom']),
+                    'room': int(df.loc[i, 'bedroom']),
+                    'area': int(df.loc[i, 'size']),
+                    'year_built': int(df.loc[i, 'year']),
+                    'price': int(df.loc[i, 'price']),
+                    'garage': int(df.loc[i, 'garage']),
+                    'type': random.randint(1, 6)
+                    }
+            if i < 5000:
+                title = 'house'
+                if i < 1234:
+                    title = 'a second hand ' + title
+            else:
+                title = 'apartment'
+                if i < 7654:
+                    title = 'a new ' + title
 
-        info['details'] = ''
-        if df.loc[i, 'garage'] > 0:
-            title = title + ' with ' + str(int(df.loc[i, 'garage'])) + ' garden'
-        if df.loc[i, 'pool'] > 0:
-            info['details'] = info['details'] + 'have ' + str(df.loc[i, 'pool']) + 'swimming pool '
-        if df.loc[i, 'yard'] > 0:
-            info['details'] = info['details'] + 'have a ' + str(df.loc[i, 'yard']) + 'square feet yard '
-        session.add(
-            Asset(revision=version,
-                  asset_id=id,
-                  asset_user=user,
-                  asset_agent=agent,
-                  asset_inspector=inspector,
-                  asset_title=title,
-                  asset_location=location,
-                  asset_info=info,
+            info['details'] = ''
+            if df.loc[i, 'garage'] > 0:
+                title = title + ' with ' + str(int(df.loc[i, 'garage'])) + ' garden'
+            if df.loc[i, 'pool'] > 0:
+                info['details'] = info['details'] + 'have ' + str(df.loc[i, 'pool']) + 'swimming pool '
+            if df.loc[i, 'yard'] > 0:
+                info['details'] = info['details'] + 'have a ' + str(df.loc[i, 'yard']) + 'square feet yard '
+            session.add(
+                Asset(revision=version,
+                      asset_id=id,
+                      asset_user=user,
+                      asset_agent=agent,
+                      asset_inspector=inspector,
+                      asset_title=title,
+                      asset_location=location,
+                      asset_info=info,
                       asset_open=datetime.datetime.now(),
                       asset_status=1,
                       asset_type=type))
