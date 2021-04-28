@@ -40,7 +40,7 @@ class User(Base):
     user_email = Column(VARCHAR(32))
     user_phone = Column(VARCHAR(32))
     user_bio = Column(VARCHAR(32))
-    user_timeoffset = Column(INT)
+    user_timezone = Column(INT)
     user_freeze = Column(VARCHAR(1))
     user_reg_ip = Column(VARCHAR(128))
     user_reg_datetime = Column(DATETIME)
