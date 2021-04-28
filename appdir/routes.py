@@ -108,7 +108,7 @@ cache = {}
 n = {}
 
 
-@application.route('/init')
+@application.route('/')
 def init():
     getaction()
     getasset()
@@ -378,7 +378,6 @@ def get_user_matrix():
     bathroom_max = 0
     garage_max = 0
 
-
     for user in search:
         if user not in matrix:
             matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {},
@@ -488,85 +487,68 @@ def get_user_matrix():
             for type in matrix[user]['type']:
                 matrix[user]['type'][type] = matrix[user]['type'][type] / matrix[user]['time']
             type_sort = sorted(matrix[user]['type'], key=matrix[user]['type'].get, reverse=True)
-            if matrix[user]['type'][type_sort[0]] > 0.5:
-                matrix[user]["type"] = type_sort[0]
-            else:
-                matrix[user]["type"] = None
+            matrix[user]["type"] = type_sort[0]
 
         if len(matrix[user]['area']) > 0:
             for area in matrix[user]['area']:
                 matrix[user]['area'][area] = matrix[user]['area'][area] / matrix[user]['time']
             area_user_sort = sorted(matrix[user]['area'], key=matrix[user]['area'].get, reverse=True)
-            if matrix[user]['area'][area_user_sort[0]] > 0.4:
-                matrix[user]["area"] = area_user_sort[0]
-                if matrix[user]['area'][area_user_sort[1]] > matrix[user]['area'][area_user_sort[1]] - 0.15:
-                    matrix[user]["area"] = (area_user_sort[0] + area_user_sort[0]) / 2
-            else:
-                matrix[user]["type"] = None
+            matrix[user]["area"] = area_user_sort[0]
+            if matrix[user]['area'][area_user_sort[1]] > matrix[user]['area'][area_user_sort[0]] - 0.15:
+                matrix[user]["area"] = (area_user_sort[0] + area_user_sort[0]) / 2
 
         if len(matrix[user]['price']) > 0:
             for price in matrix[user]['price']:
                 matrix[user]['price'][price] = matrix[user]['price'][price] / matrix[user]['time']
             price_user_sort = sorted(matrix[user]['price'], key=matrix[user]['price'].get, reverse=True)
-            if matrix[user]['price'][price_user_sort[0]] > 0.4:
-                matrix[user]["price"] = price_user_sort[0]
-                if matrix[user]['price'][price_user_sort[1]] > matrix[user]['price'][price_user_sort[1]] - 0.15:
-                    matrix[user]["price"] = (price_user_sort[0] + price_user_sort[0]) / 2
-            else:
-                matrix[user]["price"] = None
+            matrix[user]["price"] = price_user_sort[0]
+            if matrix[user]['price'][price_user_sort[1]] > matrix[user]['price'][price_user_sort[0]] - 0.15:
+                matrix[user]["price"] = (price_user_sort[0] + price_user_sort[0]) / 2
 
         if len(matrix[user]['room']) > 0:
             for room in matrix[user]['room']:
                 matrix[user]['room'][room] = matrix[user]['room'][room] / matrix[user]['time']
             room_sort = sorted(matrix[user]['room'], key=matrix[user]['room'].get, reverse=True)
-            if matrix[user]['room'][room_sort[0]] > 0.4:
-                matrix[user]["room"] = room_sort[0]
-                if matrix[user]['room'][room_sort[1]] > matrix[user]['room'][room_sort[1]] - 0.15:
-                    if room_sort[1] < room_sort[0]:
-                        matrix[user]["room"] = room_sort[1]
-                    else:
-                        matrix[user]["room"] = room_sort[0]
-            else:
-                matrix[user]["room"] = None
+            matrix[user]["room"] = room_sort[0]
+            if matrix[user]['room'][room_sort[1]] > matrix[user]['room'][room_sort[0]] - 0.15:
+                if room_sort[1] < room_sort[0]:
+                    matrix[user]["room"] = room_sort[1]
+            if matrix[user]["room"] > room_max:
+                room_max = matrix[user]["room"]
 
         if len(matrix[user]['bathroom']) > 0:
             for bathroom in matrix[user]['bathroom']:
                 matrix[user]['bathroom'][bathroom] = matrix[user]['bathroom'][bathroom] / matrix[user]['time']
             bathroom_sort = sorted(matrix[user]['bathroom'], key=matrix[user]['bathroom'].get, reverse=True)
-            if matrix[user]['bathroom'][bathroom_sort[0]] > 0.4:
-                matrix[user]["bathroom"] = bathroom_sort[0]
-                if matrix[user]['bathroom'][bathroom_sort[1]] > matrix[user]['bathroom'][bathroom_sort[1]] - 0.15:
-                    if bathroom_sort[1] < bathroom_sort[0]:
-                        matrix[user]["bathroom"] = bathroom_sort[1]
-                    else:
-                        matrix[user]["bathroom"] = bathroom_sort[0]
-            else:
-                matrix[user]["bathroom"] = None
+            matrix[user]["bathroom"] = bathroom_sort[0]
+            if matrix[user]['bathroom'][bathroom_sort[1]] > matrix[user]['bathroom'][bathroom_sort[0]] - 0.15:
+                if bathroom_sort[1] < bathroom_sort[0]:
+                    matrix[user]["bathroom"] = bathroom_sort[1]
+                else:
+                    matrix[user]["bathroom"] = bathroom_sort[0]
+            if matrix[user]["bathroom"] > bathroom_max:
+                 bathroom_max = matrix[user]["bathroom"]
 
         if len(matrix[user]['garage']) > 0:
             for garage in matrix[user]['garage']:
                 matrix[user]['garage'][garage] = matrix[user]['garage'][garage] / matrix[user]['time']
             garage_sort = sorted(matrix[user]['garage'], key=matrix[user]['garage'].get, reverse=True)
-            if matrix[user]['garage'][garage_sort[0]] > 0.4:
-                matrix[user]["garage"] = garage_sort[0]
-                if matrix[user]['garage'][garage_sort[1]] > matrix[user]['garage'][garage_sort[1]] - 0.15:
-                    if garage_sort[1] < garage_sort[0]:
-                        matrix[user]["garage"] = garage_sort[1]
-                    else:
-                        matrix[user]["garage"] = garage_sort[0]
-            else:
-                matrix[user]["garage"] = None
+            matrix[user]["garage"] = garage_sort[0]
+            if matrix[user]['garage'][garage_sort[1]] > matrix[user]['garage'][garage_sort[0]] - 0.15:
+                if garage_sort[1] < garage_sort[0]:
+                    matrix[user]["garage"] = garage_sort[1]
+                else:
+                    matrix[user]["garage"] = garage_sort[0]
+            if matrix[user]["garage"] > room_max:
+                room_max = matrix[user]["garage"]
 
         if len(matrix[user]['year']) > 0:
             for year in matrix[user]['year']:
                 matrix[user]['year'][year] = matrix[user]['year'][year] / matrix[user]['time']
             year_user_sort = sorted(matrix[user]['year'], key=matrix[user]['year'].get, reverse=True)
-            if matrix[user]['year'][year_user_sort[0]] > 0.4:
-                matrix[user]["year"] = year_user_sort[0]
-                if matrix[user]['year'][year_user_sort[1]] > matrix[user]['year'][year_user_sort[1]] - 0.15:
-                    matrix[user]["year"] = (year_user_sort[0] + year_user_sort[0]) / 2
-            else:
-                matrix[user]["year"] = None
+            matrix[user]["year"] = year_user_sort[0]
+            if matrix[user]['year'][year_user_sort[1]] > matrix[user]['year'][year_user_sort[0]] - 0.15:
+                matrix[user]["year"] = (year_user_sort[0] + year_user_sort[0]) / 2
 
         matrix[user]["words"] = []
         if len(matrix[user]['description']) > 0:
@@ -577,12 +559,16 @@ def get_user_matrix():
                 if matrix[user]['description'][word] > 0.5:
                     matrix[user]["words"].append(word)
 
-        for other in similar_user:
-            if matrix[user]['city_first'] == matrix[other]['city_first'] or matrix[user]['city_first'] == matrix[other]['city_second'] or matrix[user]['city_second'] == matrix[other]['city_first'] or matrix[user]['city_second'] == matrix[other]['city_second']:
-                cos =
-
-
-
+    for user1 in matrix:
+        similar_user[user1] = {}
+        for user2 in matrix:
+            if matrix[user2]["city_first"] == matrix[user1]["city_first"] or matrix[user2]["city_first"] == matrix[user1]["city_second"]:
+                similar_user[user1][user2] = ((matrix[user1]["area"]/5) * (matrix[user2]["area"]/5) + (matrix[user1]["price"]/5) * (matrix[user2]["price"]/5) +(matrix[user1]["room"]/room_max) * (matrix[user2]["room"]/room_max) + (matrix[user1]["bathroom"] / bathroom_max) * (matrix[user2]["bathroom"] / bathroom_max) +(matrix[user1]["garage"] / garage_max) * (matrix[user2]["garage"] / garage_max) + (matrix[user1]["year"] / 5) * (matrix[user2]["year"] / 5)) / (sqrt(pow(matrix[user1]["area"]/5, 2) + pow(matrix[user1]["price"]/5, 2) +pow(matrix[user1]["room"]/room_max, 2) + pow(matrix[user1]["bathroom"] / bathroom_max, 2) + pow(matrix[user1]["garage"] / garage_max, 2) + pow(matrix[user1]["year"] / 5, 2)) * sqrt(pow(matrix[user2]["area"] / 5, 2) + pow(matrix[user2]["price"] / 5, 2) + pow(matrix[user2]["room"] / room_max, 2) + pow(matrix[user2]["bathroom"] / bathroom_max, 2) + pow(matrix[user2]["garage"] / garage_max, 2) + pow(matrix[user2]["year"] / 5, 2)))
+                if matrix[user2]['type'] == matrix[user1]['type']:
+                    similar_user[user1][user2] = similar_user[user1][user2] + 0.1
+            else:
+                similar_user[user1][user2] = 0
+        print(similar_user[user1])
     return matrix
 
 
@@ -658,10 +644,10 @@ def analysispreference(matrix, user, time, area_sort, price_sort, year_sort, fir
 
 
 def getmatrix(matrix, asset, user, time, area_sort, price_sort, year_sort, first, second, third, forth):
-    if 'region' in assets_all[asset]:
-        if assets_all[asset]['region'] not in matrix[user]['region']:
-            matrix[user]['region'][assets_all[asset]['region']] = 0
-        matrix[user]['region'][assets_all[asset]['region']] = matrix[user]['region'][assets_all[asset]['region']] + time
+    if 'subregion' in assets_all[asset]:
+        if assets_all[asset]['subregion'] not in matrix[user]['subregion']:
+            matrix[user]['subregion'][assets_all[asset]['subregion']] = 0
+        matrix[user]['subregion'][assets_all[asset]['subregion']] = matrix[user]['subregion'][assets_all[asset]['subregion']] + time
 
     if assets_all[asset]['type'] not in matrix[user]['type']:
         matrix[user]['type'][assets_all[asset]['type']] = 0
