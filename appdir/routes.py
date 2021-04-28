@@ -727,11 +727,9 @@ def retrieval():
     """
     result = {}
     # get data
-    user = None
     location = None
     info = None
     if request.method == "POST":
-        user = int(request.form.get('user'))
         location = json.loads(request.form.get('location'))
         info = json.loads(request.form.get('info'))
 
@@ -826,17 +824,23 @@ def retrieval():
             if result[asset]['time'] < time_min:
                 time_min = result[asset]['time']
 
-    print('1111')
     sort = sorted(popularity_value, key=popularity_value.get, reverse=True)
     for i in result:
         result[i]["distance"] = 1 - ((result[i]["distance"] - dis_min) / (dis_max - dis_min))
         result[i]['match'] = result[i]["match"] / 7
         result[i]['details'] = result[i]['details'] / det_max
         result[i]['time'] = 1 - ((result[i]["time"] - time_min) / (time_max - time_min))
-        # result[i]['pop'] = popularity_value[i] / popularity_value[sort[0]]
-        print(result[i]['time'])
+        if popularity_value[sort[0]] > 0:
+            result[i]['pop'] = popularity_value[i] / popularity_value[sort[0]]
+        else:
+            result[i]['pop'] = popularity_value[i] = 0
+        result[i] = result[i]["distance"] + result[i]['match'] + result[i]['details'] + result[i]['time'] + result[i]['pop']
 
-    return "success"
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data": sorted(result, key=result.get, reverse=True)
+    })
 
 
 @application.route('/addaction')
