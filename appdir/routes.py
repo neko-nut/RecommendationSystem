@@ -1,3 +1,4 @@
+# syslib
 import datetime
 import json
 import math
@@ -6,18 +7,21 @@ import time
 from math import sqrt
 import random
 
+# external lib
 import pandas as pd
 from flask import request, jsonify
 from influxdb import InfluxDBClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sshtunnel import SSHTunnelForwarder
-
 import appdir.porter as porter
+
+# flask env
 from appdir import application
 from appdir.config import Config
 from appdir.models import Asset, User
 
+# MySQL
 server = SSHTunnelForwarder(
     ('101.32.220.109', 22),
     ssh_username="root",
@@ -38,6 +42,7 @@ engine = create_engine(
 Session = sessionmaker(bind=engine)
 session = Session()
 
+# InfluxDB
 server1 = SSHTunnelForwarder(
     ('101.32.220.109', 22),
     ssh_username="root",
@@ -47,6 +52,7 @@ server1 = SSHTunnelForwarder(
 server1.start()
 client = InfluxDBClient('127.0.0.1', str(server1.local_bind_port), 'root', 'root', 'apex')
 
+# US region info
 with open(Config.stopwords, 'r') as f:
     stopwords = set(f.read().split())
 
@@ -105,6 +111,8 @@ price_min = 2147483647
 price_max = 0
 year_min = 2147483647
 year_max = 0
+
+# Porter
 p = porter.PorterStemmer()
 cache = {}
 n = {}
@@ -855,6 +863,7 @@ def addaction():
     return "success"
 
 
+# fill DB
 @application.route('/add')
 def add():
     attributes = [
