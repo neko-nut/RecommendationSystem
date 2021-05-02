@@ -56,31 +56,31 @@ client = InfluxDBClient('127.0.0.1', str(server1.local_bind_port), 'root', 'root
 with open(Config.stopwords, 'r') as f:
     stopwords = set(f.read().split())
 
-zip_code = {}
-state = {}
-with open(Config.zip, 'r') as f:
-    line = f.readline()
-    while len(line) > 0:
-        line = re.split("[^a-z|A-Z|0-9| ]", str(line))
-        line = [x for x in line if x != '']
-        line = [x for x in line if x != ' ']
-        state[line[4]] = line[3]
-        line = f.readline()
-    state['PR'] = 'Puerto Rico'
-    state['VI'] = 'Virgin Islands'
-    state['AE'] = 'Armed Forces – Europe'
-    state['AA'] = 'Armed Forces – Americas'
-    state['AP'] = 'Armed Forces – Pacific'
-    state['AS'] = 'American Samoa'
-    print(len(state))
-
-with open(Config.zips, 'r') as load_f:
-    load_dict = json.load(load_f)
-    # print(load_dict)
-    for zip in load_dict:
-        if zip['country'] == "US":
-            zip_code[zip['zip_code']] = {"country": zip['country'].split('[^a-z|A-Z| ]')[0], "subregion": zip['city'].split('[^a-z|A-Z| ]')[0], 'region': state[zip['state']].split('[^a-z|A-Z| ]')[0]}
-    print(zip_code)
+# zip_code = {}
+# state = {}
+# with open(Config.zip, 'r') as f:
+#     line = f.readline()
+#     while len(line) > 0:
+#         line = re.split("[^a-z|A-Z|0-9| ]", str(line))
+#         line = [x for x in line if x != '']
+#         line = [x for x in line if x != ' ']
+#         state[line[4]] = line[3]
+#         line = f.readline()
+#     state['PR'] = 'Puerto Rico'
+#     state['VI'] = 'Virgin Islands'
+#     state['AE'] = 'Armed Forces – Europe'
+#     state['AA'] = 'Armed Forces – Americas'
+#     state['AP'] = 'Armed Forces – Pacific'
+#     state['AS'] = 'American Samoa'
+#     print(len(state))
+#
+# with open(Config.zips, 'r') as load_f:
+#     load_dict = json.load(load_f)
+#     # print(load_dict)
+#     for zip in load_dict:
+#         if zip['country'] == "US":
+#             zip_code[zip['zip_code']] = {"country": zip['country'].split('[^a-z|A-Z| ]')[0], "subregion": zip['city'].split('[^a-z|A-Z| ]')[0], 'region': state[zip['state']].split('[^a-z|A-Z| ]')[0]}
+#     print(zip_code)
 
 # asset: time
 actions = {}
@@ -313,7 +313,6 @@ def getuserinfo():
             popularity[asset] = popularity[asset] + 1
         popularity_user[user.user_id] = user.user_favorites
         preference[user.user_id] = user.user_preference
-        print(preference[user.user_id])
         if user.user_reg_datetime > datetime.datetime.now() - datetime.timedelta(days=30):
             user_new.add(user.user_id)
     return jsonify({
@@ -497,7 +496,7 @@ def get_user_matrix():
             for price in matrix[user]['price']:
                 matrix[user]['price'][price] = matrix[user]['price'][price] / matrix[user]['time']
             price_user_sort = sorted(matrix[user]['price'], key=matrix[user]['price'].get, reverse=True)
-            matrix[user]["price"] = price_user_sort[0]
+            user_feature[user]["price"] = price_user_sort[0]
             if len(price_user_sort) > 1 and matrix[user]['price'][price_user_sort[1]] > matrix[user]['price'][price_user_sort[0]] - 0.15:
                 matrix[user]["price"] = (price_user_sort[0] + price_user_sort[0]) / 2
 
@@ -505,7 +504,7 @@ def get_user_matrix():
             for room in matrix[user]['room']:
                 matrix[user]['room'][room] = matrix[user]['room'][room] / matrix[user]['time']
             room_sort = sorted(matrix[user]['room'], key=matrix[user]['room'].get, reverse=True)
-            matrix[user]["room"] = room_sort[0]
+            user_feature[user]["room"] = room_sort[0]
             if len(room_sort) > 1 and matrix[user]['room'][room_sort[1]] > matrix[user]['room'][room_sort[0]] - 0.15:
                 if room_sort[1] < room_sort[0]:
                     matrix[user]["room"] = room_sort[1]
@@ -514,7 +513,7 @@ def get_user_matrix():
             for bathroom in matrix[user]['bathroom']:
                 matrix[user]['bathroom'][bathroom] = matrix[user]['bathroom'][bathroom] / matrix[user]['time']
             bathroom_sort = sorted(matrix[user]['bathroom'], key=matrix[user]['bathroom'].get, reverse=True)
-            matrix[user]["bathroom"] = bathroom_sort[0]
+            user_feature[user]["bathroom"] = bathroom_sort[0]
             if len(bathroom_sort) > 1 and matrix[user]['bathroom'][bathroom_sort[1]] > matrix[user]['bathroom'][bathroom_sort[0]] - 0.15:
                 if bathroom_sort[1] < bathroom_sort[0]:
                     matrix[user]["bathroom"] = bathroom_sort[1]
@@ -525,7 +524,7 @@ def get_user_matrix():
             for garage in matrix[user]['garage']:
                 matrix[user]['garage'][garage] = matrix[user]['garage'][garage] / matrix[user]['time']
             garage_sort = sorted(matrix[user]['garage'], key=matrix[user]['garage'].get, reverse=True)
-            matrix[user]["garage"] = garage_sort[0]
+            user_feature[user]["garage"] = garage_sort[0]
             if len(garage_sort) > 1 and matrix[user]['garage'][garage_sort[1]] > matrix[user]['garage'][garage_sort[0]] - 0.15:
                 if garage_sort[1] < garage_sort[0]:
                     matrix[user]["garage"] = garage_sort[1]
@@ -536,19 +535,19 @@ def get_user_matrix():
             for year in matrix[user]['year']:
                 matrix[user]['year'][year] = matrix[user]['year'][year] / matrix[user]['time']
             year_user_sort = sorted(matrix[user]['year'], key=matrix[user]['year'].get, reverse=True)
-            matrix[user]["year"] = year_user_sort[0]
+            user_feature[user]["year"] = year_user_sort[0]
             if len(year_user_sort) > 1 and matrix[user]['year'][year_user_sort[1]] > matrix[user]['year'][year_user_sort[0]] - 0.15:
                 matrix[user]["year"] = (year_user_sort[0] + year_user_sort[0]) / 2
 
-        matrix[user]["words"] = []
+        user_feature[user]["words"] = []
         if len(matrix[user]['description']) > 0:
             for word in matrix[user]['description']:
                 matrix[user]['description'][word] = matrix[user]['description'][word] / matrix[user]['time']
             description_sort = sorted(matrix[user]['description'], key=matrix[user]['description'].get, reverse=True)
             for word in description_sort:
                 if matrix[user]['description'][word] > 0.5:
-                    matrix[user]["words"].append(word)
-        print(matrix[user])
+                    user_feature[user]["words"].append(word)
+        print(user_feature[user])
     return jsonify({
         "code": 200,
         "msg": "OK"
@@ -567,17 +566,17 @@ def userinterest():
             user_interest[user][asset] = user_interest[user][asset] + 1000
 
 
-# def recommendlist():
-#     for user1 in matrix:
-#         similar_user[user1] = {}
-#         for user2 in matrix:
-#             if matrix[user2]["city_first"] == matrix[user1]["city_first"] or matrix[user2]["city_first"] == matrix[user1]["city_second"]:
-#                 similar_user[user1][user2] = ((matrix[user1]["area"]/5) * (matrix[user2]["area"]/5) + (matrix[user1]["price"]/5) * (matrix[user2]["price"]/5) +(matrix[user1]["room"]/room_max) * (matrix[user2]["room"]/room_max) + (matrix[user1]["bathroom"] / bathroom_max) * (matrix[user2]["bathroom"] / bathroom_max) +(matrix[user1]["garage"] / garage_max) * (matrix[user2]["garage"] / garage_max) + (matrix[user1]["year"] / 5) * (matrix[user2]["year"] / 5)) / (sqrt(pow(matrix[user1]["area"]/5, 2) + pow(matrix[user1]["price"]/5, 2) +pow(matrix[user1]["room"]/room_max, 2) + pow(matrix[user1]["bathroom"] / bathroom_max, 2) + pow(matrix[user1]["garage"] / garage_max, 2) + pow(matrix[user1]["year"] / 5, 2)) * sqrt(pow(matrix[user2]["area"] / 5, 2) + pow(matrix[user2]["price"] / 5, 2) + pow(matrix[user2]["room"] / room_max, 2) + pow(matrix[user2]["bathroom"] / bathroom_max, 2) + pow(matrix[user2]["garage"] / garage_max, 2) + pow(matrix[user2]["year"] / 5, 2)))
-#                 if matrix[user2]['type'] == matrix[user1]['type']:
-#                     similar_user[user1][user2] = similar_user[user1][user2] + 0.1
-#             else:
-#                 similar_user[user1][user2] = 0
-#         print(similar_user[user1])
+def recommendlist():
+    for user1 in user_feature:
+        user_feature[user1] = {}
+        for user2 in user_feature:
+            if user_feature[user2]["city_first"] == user_feature[user1]["city_first"] or user_feature[user2]["city_first"] == user_feature[user1]["city_second"]:
+                similar_user[user1][user2] = ((user_feature[user1]["area"]/5) * (user_feature[user2]["area"]/5) + (user_feature[user1]["price"]/5) * (user_feature[user2]["price"]/5) +(user_feature[user1]["room"]/room_max) * (user_feature[user2]["room"]/room_max) + (user_feature[user1]["bathroom"] / bathroom_max) * (user_feature[user2]["bathroom"] / bathroom_max) +(user_feature[user1]["garage"] / garage_max) * (user_feature[user2]["garage"] / garage_max) + (matrix[user1]["year"] / 5) * (matrix[user2]["year"] / 5)) / (sqrt(pow(matrix[user1]["area"]/5, 2) + pow(matrix[user1]["price"]/5, 2) +pow(matrix[user1]["room"]/room_max, 2) + pow(matrix[user1]["bathroom"] / bathroom_max, 2) + pow(matrix[user1]["garage"] / garage_max, 2) + pow(matrix[user1]["year"] / 5, 2)) * sqrt(pow(matrix[user2]["area"] / 5, 2) + pow(matrix[user2]["price"] / 5, 2) + pow(matrix[user2]["room"] / room_max, 2) + pow(matrix[user2]["bathroom"] / bathroom_max, 2) + pow(matrix[user2]["garage"] / garage_max, 2) + pow(matrix[user2]["year"] / 5, 2)))
+                if user_feature[user2]['type'] == user_feature[user1]['type']:
+                    user_feature[user1][user2] = user_feature[user1][user2] + 0.1
+            else:
+                similar_user[user1][user2] = 0
+        print(similar_user[user1])
 
 @application.route('/recommend', methods=['GET', 'POST'])
 def recommend():
@@ -607,11 +606,11 @@ def analysispreference(matrix, user, time, area_sort, price_sort, year_sort, fir
                 matrix[user]['type'][t] = 0
             matrix[user]['type'][t] = matrix[user]['type'][t] + time
 
-    # if 'location_range' in preference[user]:
-    #     if preference[user]['location_range'] not in matrix[user]['subregion']:
-    #         matrix[user]['subregion'][preference[user]['location_range']] = 0
-    #     matrix[user]['subregion'][preference[user]['location_range']] = matrix[user]['subregion'][
-    #                                                                      preference[user]['location_range']] + time
+    if 'location_range' in preference[user]:
+        if preference[user]['location_range'] not in matrix[user]['subregion']:
+            matrix[user]['subregion'][preference[user]['location_range']] = 0
+        matrix[user]['subregion'][preference[user]['location_range']] = matrix[user]['subregion'][
+                                                                         preference[user]['location_range']] + time
 
     if 'area_range' in preference[user]:
         min = getstate(area_sort, preference[user]['area_range'][0], 'area', first, second, third, forth)
