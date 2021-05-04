@@ -2,13 +2,11 @@
 import datetime
 import json
 import math
-import random
 import re
 import time
 from math import sqrt
 
 # external lib
-import pandas as pd
 from flask import request, jsonify
 from influxdb import InfluxDBClient
 from sqlalchemy import create_engine
@@ -108,8 +106,11 @@ user_feature = {}
 agent_feature = {}
 # agent: [asset, ...]
 agent_asset = {}
-# user: [asset, ...]
-recommend_user = {}
+# user/agent/asset: [asset/agent, ...]
+recommend_user_asset = {}
+recommend_user_agent = {}
+recommend_asset_agent = {}
+recommend_agent_asset = {}
 
 area_min = 2147483647
 area_max = 0
@@ -141,6 +142,7 @@ third = 0
 forth = 0
 
 
+# init
 @application.route('/')
 def init():
     getaction()
@@ -148,7 +150,7 @@ def init():
     getuserinfo()
     getpopularity()
     get_user_matrix()
-    recommendlist()
+    user_asset_matrix()
     get_agent()
     return jsonify({
         "code": 200,
@@ -187,24 +189,6 @@ def getaction():
         "code": 200,
         "msg": "OK"
     })
-
-
-def wordsanalysis(words):
-    index = {}
-    for w in words:
-        if w not in stopwords:
-            if w not in cache:
-                cache[w] = p.stem(w)
-            w = cache[w]
-            if w not in index:
-                index[w] = 1
-                if w not in n:
-                    n[w] = 1
-                else:
-                    n[w] = n[w] + 1
-            else:
-                index[w] = index[w] + 1
-    return index
 
 
 @application.route('/getasset')
@@ -391,6 +375,24 @@ def getasset():
     })
 
 
+def wordsanalysis(words):
+    index = {}
+    for w in words:
+        if w not in stopwords:
+            if w not in cache:
+                cache[w] = p.stem(w)
+            w = cache[w]
+            if w not in index:
+                index[w] = 1
+                if w not in n:
+                    n[w] = 1
+                else:
+                    n[w] = n[w] + 1
+            else:
+                index[w] = index[w] + 1
+    return index
+
+
 @application.route('/getuserinfo')
 def getuserinfo():
     global popularity
@@ -449,6 +451,17 @@ def minmax(dic):
     return dic
 
 
+@application.route('/getagent')
+def get_agent():
+    agents = session.query(Agent).all()
+    for agent in agents:
+        preference_agent[agent.agent_id] = agents.agents_preference
+    return jsonify({
+        "code": 200,
+        "msg": "OK"
+    })
+
+
 @application.route('/usermatrix')
 def get_user_matrix():
     """
@@ -476,8 +489,7 @@ def get_user_matrix():
 
     for user in search:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {},
-                            'garage': {}, 'description': {}}
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
         for record in search[user]:
             matrix[user]['time'] = matrix[user]['time'] + search_worth
             if 'location' in record:
@@ -516,8 +528,7 @@ def get_user_matrix():
                 if 'bathroom' in record['info']:
                     if record['info']['bathroom'] not in matrix[user]['bathroom']:
                         matrix[user]['bathroom'][record['info']['bathroom']] = 0
-                    matrix[user]['bathroom'][record['info']['bathroom']] = matrix[user]['bathroom'][
-                                                                               record['info']['bathroom']] + search_worth
+                    matrix[user]['bathroom'][record['info']['bathroom']] = matrix[user]['bathroom'][record['info']['bathroom']] + search_worth
 
                 if 'year' in record['info']:
                     min = getstate(area_sort, record['info']['year'][0], 'price')
@@ -530,8 +541,7 @@ def get_user_matrix():
                 if 'garage' in record['info']:
                     if record['info']['garage'] not in matrix[user]['garage']:
                         matrix[user]['garage'][record['info']['garage']] = 0
-                    matrix[user]['garage'][record['info']['garage']] = matrix[user]['garage'][
-                                                                           record['info']['garage']] + search_worth
+                    matrix[user]['garage'][record['info']['garage']] = matrix[user]['garage'][record['info']['garage']] + search_worth
 
     for user in actions_user:
         if user not in matrix:
@@ -674,8 +684,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'location' in preference[user]:
         if preference[user]['location'] not in matrix[user]['subregion']:
             matrix[user]['subregion'][preference[user]['location']] = 0
-        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][
-                                                                      preference[user]['location']] + time
+        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][preference[user]['location']] + time
 
     if 'area_range' in preference[user]:
         min = getstate(area_sort, preference[user]['area_range'][0], 'area')
@@ -696,8 +705,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'room_num_range' in preference[user]:
         if preference[user]['room_num_range'][0] not in matrix[user]['room']:
             matrix[user]['room'][preference[user]['room_num_range'][0]] = 0
-        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][
-                                                                          preference[user]['room_num_range'][0]] + time
+        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][preference[user]['room_num_range'][0]] + time
 
     if 'bathroom_num_range' in preference[user]:
         if preference[user]['bathroom_num_range'][0] not in matrix[user]['bathroom']:
@@ -769,8 +777,8 @@ def analysis_asset(matrix, asset, user, time):
 
 
 @application.route('/usermatrix')
-def recommendlist():
-    global recommend_user
+def user_asset_matrix():
+    global recommend_user_asset
     if len(user_feature) < 1000:
         for user in user_feature:
             location = {'subregion': user_feature[user]["city_first"]}
@@ -789,7 +797,7 @@ def recommendlist():
             if user_feature[user]["city_second"] is not None:
                 location = {'subregion': user_feature[user]["city_second"]}
                 result.append(ir(location, info))
-            recommend_user[user] = sorted(result, key=result.get, reverse=True)
+            recommend_user_asset[user] = sorted(result, key=result.get, reverse=True)
     else:
         user_interest = {}
         similar_user = {}
@@ -809,39 +817,50 @@ def recommendlist():
             similar_user[user] = {}
             for user2 in user_feature:
                 if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
-                    len_user1 = pow(user_feature[user]["area"] / 5, 2) + pow(user_feature[user]["price"] / 5, 2) + pow(user_feature[user]["year"] / 5, 2)
-                    len_user2 = pow(user_feature[user2]["area"] / 5, 2) + pow(user_feature[user2]["price"] / 5, 2) + pow(user_feature[user2]["year"] / 5, 2)
-                    similar_user[user][user2] = (user_feature[user]["area"] / 5) * (user_feature[user2]["area"] / 5) + \
-                                                (user_feature[user]["price"] / 5) * (user_feature[user2]["price"] / 5) + \
-                                                (user_feature[user]["year"] / 5) * (user_feature[user2]["year"] / 5)
-                    if room_max > 0:
-                        len_user1 = len_user1 + pow(user_feature[user]["room"] / room_max, 2)
-                        len_user2 = len_user2 + pow(user_feature[user2]["room"] / room_max, 2)
-                        similar_user[user][user2] = similar_user[user][user2] + (user_feature[user]["room"] / room_max) * (user_feature[user2]["room"] / room_max)
-                    if bathroom_max > 0:
-                        len_user1 = len_user1 + pow(user_feature[user]["bathroom"] / bathroom_max, 2)
-                        len_user2 = len_user2 + pow(user_feature[user2]["bathroom"] / bathroom_max, 2)
-                        similar_user[user][user2] = similar_user[user][user2] + (user_feature[user]["bathroom"] / bathroom_max) * (user_feature[user2]["bathroom"] / bathroom_max)
-
-                    if garage_max > 0:
-                        len_user1 = len_user1 + pow(user_feature[user]["garage"] / garage_max, 2)
-                        len_user2 = len_user2 + pow(user_feature[user2]["garage"] / garage_max, 2)
-                        similar_user[user][user2] = similar_user[user][user2] + (user_feature[user]["garage"] / garage_max) * (user_feature[user2]["garage"] / garage_max)
-                    len_user1 = sqrt(len_user1)
-                    len_user2 = sqrt(len_user2)
-                    if len_user1 + len_user2 > 0:
-                        similar_user[user][user2] = similar_user[user][user2] / (len_user1 + len_user2)
-                    if user_feature[user2]['type'] == user_feature[user]['type']:
-                        similar_user[user][user2] = similar_user[user][user2] + 0.1
+                    similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
         for user in user_feature:
             prefer = {}
+            rec = {}
             for user2 in similar_user[user]:
                 if user2 in user_interest:
                     for asset in user_interest[user2]:
                         if asset not in prefer:
                             prefer[asset] = 0
                         prefer[asset] = prefer[asset] + (similar_user[user][user2] + 1) * user_interest[user2][asset]
-            recommend_user[user] = sorted(prefer, key=prefer.get, reverse=True)
+            for asset in prefer:
+                if asset in assets_now:
+                    rec[asset] = prefer[asset]
+                    if assets_now[asset]['time'] > datetime.datetime.now() - datetime.timedelta(days=30):
+                        rec[asset] = rec[asset] * 1.2
+            recommend_user_asset[user] = sorted(rec, key=rec.get, reverse=True)
+
+
+def cos_sim_user(sim1, sim2):
+    len_user1 = pow(sim1["area"] / 5, 2) + pow(sim1["price"] / 5, 2) + pow(sim1["year"] / 5, 2)
+    len_user2 = pow(sim2["area"] / 5, 2) + pow(sim2["price"] / 5, 2) + pow(sim2["year"] / 5, 2)
+    sim_score = (sim1["area"] / 5) * (sim2["area"] / 5) + \
+                (sim1["price"] / 5) * (sim2["price"] / 5) + \
+                (sim1["year"] / 5) * (sim2["year"] / 5)
+    if room_max > 0:
+        len_user1 = len_user1 + pow(sim1["room"] / room_max, 2)
+        len_user2 = len_user2 + pow(sim2["room"] / room_max, 2)
+        sim_score = sim_score + (sim1["room"] / room_max) * (sim2["room"] / room_max)
+    if bathroom_max > 0:
+        len_user1 = len_user1 + pow(sim1["bathroom"] / bathroom_max, 2)
+        len_user2 = len_user2 + pow(sim2["bathroom"] / bathroom_max, 2)
+        sim_score = sim_score + (sim1["bathroom"] / bathroom_max) * (sim2["bathroom"] / bathroom_max)
+
+    if garage_max > 0:
+        len_user1 = len_user1 + pow(sim1["garage"] / garage_max, 2)
+        len_user2 = len_user2 + pow(sim2["garage"] / garage_max, 2)
+        sim_score = sim_score + (sim1["garage"] / garage_max) * (sim2["garage"] / garage_max)
+    len_user1 = sqrt(len_user1)
+    len_user2 = sqrt(len_user2)
+    if len_user1 + len_user2 > 0:
+        sim_score = sim_score / (len_user1 + len_user2)
+    if sim2['type'] == sim1['type']:
+        sim_score = sim_score + 0.1
+    return sim_score
 
 
 @application.route('/recommend', methods=['GET', 'POST'])
@@ -850,7 +869,7 @@ def recommend():
     result = []
     if request.method == "POST":
         user = int(request.form.get('user'))
-    for asset in recommend_user[user]:
+    for asset in recommend_user_asset[user]:
         if user not in actions_user or asset not in actions_user[user]:
             if user not in popularity_user or asset not in popularity_user[user]:
                 result.append(asset)
@@ -858,6 +877,103 @@ def recommend():
         "code": 200,
         "msg": "OK",
         "data": result
+    })
+
+
+def get_agent_matrix():
+    global agent_feature
+    matrix = {}
+    for agent in preference_agent:
+        if agent not in matrix:
+            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+        matrix = analysis_preference(matrix, preference_agent, agent, 1000)
+    for agent in agent_asset:
+        if agent not in matrix:
+            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+        for asset in agent_asset[agent]:
+            matrix = analysis_asset(matrix, asset, agent, 100)
+    for agent in matrix:
+        if len(matrix[agent]['type']) > 0:
+            for asset_type in matrix[agent]['type']:
+                matrix[agent]['type'][asset_type] = matrix[agent]['type'][asset_type] / matrix[agent]['time']
+            type_sort = sorted(matrix[agent]['type'], key=matrix[agent]['type'].get, reverse=True)
+            agent_feature[agent]["type"] = type_sort[0]
+
+        if len(matrix[agent]['area']) > 0:
+            for area in matrix[agent]['area']:
+                matrix[agent]['area'][area] = matrix[agent]['area'][area] / matrix[agent]['time']
+            area_user_sort = sorted(matrix[agent]['area'], key=matrix[agent]['area'].get, reverse=True)
+            agent_feature[agent]["area"] = area_user_sort[0]
+            if len(area_user_sort) > 1 and matrix[agent]['area'][area_user_sort[1]] > matrix[agent]['area'][area_user_sort[0]] - 0.15:
+                agent_feature[agent]["area"] = (area_user_sort[0] + area_user_sort[0]) / 2
+
+        if len(matrix[agent]['price']) > 0:
+            for price in matrix[agent]['price']:
+                matrix[agent]['price'][price] = matrix[agent]['price'][price] / matrix[agent]['time']
+            price_user_sort = sorted(matrix[agent]['price'], key=matrix[agent]['price'].get, reverse=True)
+            agent_feature[agent]["price"] = price_user_sort[0]
+            if len(price_user_sort) > 1 and matrix[agent]['price'][price_user_sort[1]] > matrix[agent]['price'][price_user_sort[0]] - 0.15:
+                agent_feature[agent]["price"] = (price_user_sort[0] + price_user_sort[0]) / 2
+
+        if len(matrix[agent]['room']) > 0:
+            for room in matrix[agent]['room']:
+                matrix[agent]['room'][room] = matrix[agent]['room'][room] / matrix[agent]['time']
+            room_sort = sorted(matrix[agent]['room'], key=matrix[agent]['room'].get, reverse=True)
+            agent_feature[agent]["room"] = room_sort[0]
+            if len(room_sort) > 1 and matrix[agent]['room'][room_sort[1]] > matrix[agent]['room'][room_sort[0]] - 0.15:
+                if room_sort[1] < room_sort[0]:
+                    agent_feature[agent]["room"] = room_sort[1]
+
+        if len(matrix[agent]['bathroom']) > 0:
+            for bathroom in matrix[agent]['bathroom']:
+                matrix[agent]['bathroom'][bathroom] = matrix[agent]['bathroom'][bathroom] / matrix[agent]['time']
+            bathroom_sort = sorted(matrix[agent]['bathroom'], key=matrix[agent]['bathroom'].get, reverse=True)
+            agent_feature[agent]["bathroom"] = bathroom_sort[0]
+            if len(bathroom_sort) > 1 and matrix[agent]['bathroom'][bathroom_sort[1]] > matrix[agent]['bathroom'][bathroom_sort[0]] - 0.15:
+                if bathroom_sort[1] < bathroom_sort[0]:
+                    agent_feature[agent]["bathroom"] = bathroom_sort[1]
+                else:
+                    agent_feature[agent]["bathroom"] = bathroom_sort[0]
+
+        if len(matrix[agent]['garage']) > 0:
+            for garage in matrix[agent]['garage']:
+                matrix[agent]['garage'][garage] = matrix[agent]['garage'][garage] / matrix[agent]['time']
+            garage_sort = sorted(matrix[agent]['garage'], key=matrix[agent]['garage'].get, reverse=True)
+            agent_feature[agent]["garage"] = garage_sort[0]
+            if len(garage_sort) > 1 and matrix[agent]['garage'][garage_sort[1]] > matrix[agent]['garage'][garage_sort[0]] - 0.15:
+                if garage_sort[1] < garage_sort[0]:
+                    agent_feature[agent]["garage"] = garage_sort[1]
+                else:
+                    agent_feature[agent]["garage"] = garage_sort[0]
+
+        if len(matrix[agent]['year']) > 0:
+            for year in matrix[agent]['year']:
+                matrix[agent]['year'][year] = matrix[agent]['year'][year] / matrix[agent]['time']
+            year_user_sort = sorted(matrix[agent]['year'], key=matrix[agent]['year'].get, reverse=True)
+            agent_feature[agent]["year"] = year_user_sort[0]
+            if len(year_user_sort) > 1 and matrix[agent]['year'][year_user_sort[1]] > matrix[agent]['year'][year_user_sort[0]] - 0.15:
+                agent_feature[agent]["year"] = (year_user_sort[0] + year_user_sort[0]) / 2
+
+    return matrix
+
+
+def user_agent_matrix():
+    for user in user_feature:
+        rec = {}
+        for agent in agent_feature:
+            rec[agent] = cos_sim_user(user_feature[user], agent_feature[agent])
+        recommend_user_agent[user] = sorted(rec, key=rec.get, reverse=True)
+
+
+@application.route('/recommendagenttouser')
+def recommend_agent_to_user():
+    user = 0
+    if request.method == "POST":
+        user = int(request.form.get('user'))
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data": recommend_user_agent[user]
     })
 
 
@@ -997,32 +1113,6 @@ def ir(location, info):
             result[i]['pop'] = popularity_value[i] = 0
         result[i] = result[i]["distance"] + result[i]['match'] + result[i]['details'] + result[i]['time'] + result[i]['pop']
     return result
-
-    return jsonify({
-        "code": 200,
-        "msg": "OK",
-        "data": sorted(result, key=result.get, reverse=True)
-    })
-
-
-# browse log
-@application.route('/addaction')
-def addaction():
-    for i in range(0, 100):
-        json_body = [
-            {
-                "measurement": "browse",
-                "tags": {
-                    "user": str(random.randint(3, 100)),
-                    "asset": str(random.randint(3, 100))
-                },
-                "fields": {
-                    "duration": random.randint(3, 100),
-                }
-            }
-        ]
-        client.write_points(json_body)
-    return "success"
 
 
 '''

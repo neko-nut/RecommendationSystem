@@ -50,3 +50,13 @@ class User(Base):
     user_favorites = Column(JSON)
     user_role = Column(INT)
 
+
+class Agent(Base):
+    __tablename__ = 'agent'
+    # Information about user
+    revision = Column(INT)
+    agent_id = Column(INT, primary_key=True)
+    agent_uid = Column(INT)
+    agent_title = Column(VARCHAR(32))
+    agent_bio = Column(Text)
+    agent_preference = Column(JSON)
