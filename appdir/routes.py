@@ -893,6 +893,16 @@ def get_agent_matrix():
         for asset in agent_asset[agent]:
             matrix = analysis_asset(matrix, asset, agent, 100)
     for agent in matrix:
+        if len(matrix[agent]['subregion']) > 0:
+            for city in matrix[agent]['subregion']:
+                matrix[agent]['subregion'][city] = matrix[agent]['subregion'][city] / matrix[agent]['time']
+            city_sort = sorted(matrix[agent]['subregion'], key=matrix[agent]['subregion'].get, reverse=True)
+            user_feature[agent]["city_first"] = city_sort[0]
+            if len(city_sort) > 1 and matrix[agent]['subregion'][city_sort[1]] > 0.1:
+                user_feature[agent]["city_second"] = city_sort[1]
+            else:
+                user_feature[agent]["city_second"] = None
+
         if len(matrix[agent]['type']) > 0:
             for asset_type in matrix[agent]['type']:
                 matrix[agent]['type'][asset_type] = matrix[agent]['type'][asset_type] / matrix[agent]['time']
@@ -965,6 +975,54 @@ def user_agent_matrix():
         recommend_user_agent[user] = sorted(rec, key=rec.get, reverse=True)
 
 
+def agent_asset_matrix():
+    for agent in agent_feature:
+        location = {'subregion': user_feature[agent]["city_first"]}
+        info = {'type': user_feature[agent]["type"],
+                'area': area_list[user_feature[agent]["area"] * 2],
+                'price': price_list[user_feature[agent]["price"] * 2],
+                'room': user_feature[agent]["room"],
+                'bathroom': user_feature[agent]["bathroom"],
+                'garage': user_feature[agent]["garage"],
+                'year_built': year_list[user_feature[agent]["year"] * 2]
+                # 'description': string
+                }
+        result = ir(location, info)
+        for asset in result:
+            result[asset] = result[asset] * 1.2
+        if user_feature[agent]["city_second"] is not None:
+            location = {'subregion': user_feature[agent]["city_second"]}
+            result.append(ir(location, info))
+        recommend_agent_asset[agent] = sorted(result, key=result.get, reverse=True)
+
+
+def asset_agent_matrix():
+    for asset in assets_now:
+        result = {}
+        for agent in agent_feature:
+            if agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']:
+                result[agent] = 0
+                if assets_now[asset]['type'] == 7 or agent['type'] == assets_now[asset]['type']:
+                    result[agent] = result[agent] + 1
+
+                if area_list[agent_feature[agent]['area'] * 2][1] > assets_now[asset]['area'] > area_list[agent_feature[agent]['area'] * 2][0]:
+                    result[agent] = result[agent] + 1
+
+                if price_list[agent_feature[agent]['price']][1] > assets_now[asset]['price'] > price_list[agent_feature[agent]['price']][0]:
+                    result[agent] = result[agent] + 1
+
+                if assets_now[asset]['room'] >= agent['room']:
+                    result[agent] = result[agent] + 1
+                if assets_now[asset]['bathroom']>= agent['bathroom']:
+                    result[agent] = result[agent] + 1
+                if assets_now[asset]['garage'] >= agent['garage']:
+                    result[agent] = result[agent] + 1
+
+                if year_list[agent_feature[agent]['year']][1] > assets_now[asset]['year'] > price_list[agent_feature[agent]['year']][0]:
+                    result[agent] = result[agent] + 1
+        recommend_asset_agent[asset] = sorted(result, key=result.get)
+
+
 @application.route('/recommendagenttouser')
 def recommend_agent_to_user():
     user = 0
@@ -974,6 +1032,34 @@ def recommend_agent_to_user():
         "code": 200,
         "msg": "OK",
         "data": recommend_user_agent[user]
+    })
+
+
+@application.route('/recommendassettoagent')
+def recommend_asset_to_agent():
+    agent = 0
+    if request.method == "POST":
+        agent = int(request.form.get('agent'))
+    result = []
+    for asset in recommend_user_agent[agent]:
+        if asset not in agent_asset[agent]:
+            result.append(asset)
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data": result
+    })
+
+
+@application.route('/recommendagenttoasset')
+def recommend_agent_to_asset():
+    asset = 0
+    if request.method == "POST":
+        asset = int(request.form.get('asset'))
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data": recommend_asset_agent[asset]
     })
 
 
@@ -1113,6 +1199,8 @@ def ir(location, info):
             result[i]['pop'] = popularity_value[i] = 0
         result[i] = result[i]["distance"] + result[i]['match'] + result[i]['details'] + result[i]['time'] + result[i]['pop']
     return result
+
+
 
 
 '''
