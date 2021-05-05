@@ -146,12 +146,27 @@ forth = 0
 @application.route('/')
 def init():
     getaction()
+    print('getaction', datetime.datetime.now())
     getasset()
+    print('getasset', datetime.datetime.now())
     getuserinfo()
+    print('getuserinfo', datetime.datetime.now())
     getpopularity()
+    print('getpopularity', datetime.datetime.now())
     get_user_matrix()
-    user_asset_matrix()
+    print('get_user_matrix', datetime.datetime.now())
+    get_user_asset_matrix()
+    print('get_user_asset_matrix', datetime.datetime.now())
     get_agent()
+    print('get_agent', datetime.datetime.now())
+    get_agent_matrix()
+    print('get_agent_matrix', datetime.datetime.now())
+    get_asset_agent_matrix()
+    print('get_asset_agent_matrix', datetime.datetime.now())
+    get_user_agent_matrix()
+    print('get_user_agent_matrix', datetime.datetime.now())
+    get_agent_asset_matrix()
+    print('get_agent_asset_matrix', datetime.datetime.now())
     return jsonify({
         "code": 200,
         "msg": "OK"
@@ -170,7 +185,8 @@ def getaction():
                 actions_user[int(record['user'])] = {}
             if int(record['asset']) not in actions_user[int(record['user'])]:
                 actions_user[int(record['user'])][int(record['asset'])] = 0
-            actions_user[int(record['user'])][int(record['asset'])] = actions_user[int(record['user'])][int(record['asset'])] + record['duration']
+            actions_user[int(record['user'])][int(record['asset'])] = actions_user[int(record['user'])][
+                                                                          int(record['asset'])] + record['duration']
             if int(record['asset']) not in actions:
                 actions[int(record['asset'])] = 0
             actions[int(record['asset'])] = actions[int(record['asset'])] + record['duration']
@@ -212,13 +228,11 @@ def getasset():
     k = 1
     b = 0.75
     doclen = {}
-    print('success')
-
     for asset in assets:
         for agent in asset.asset_agent:
             if agent not in agent_asset:
                 agent_asset[agent] = []
-            agent_asset[agent].append(asset)
+            agent_asset[agent].append(asset.asset_id)
         dic = {}
         dic['longitude'] = 200
         dic['latitude'] = 200
@@ -292,12 +306,10 @@ def getasset():
         words = re.split('[^a-z0-9]', str(words))
         words = [x for x in words if x != '']
         dic['title'] = wordsanalysis(words)
-
+        dic['state'] = asset.asset_status
         assets_all[asset.asset_id] = dic
-        if asset.asset_status == 1:
-            assets_now[asset.asset_id] = dic
+
     avg_doclen = len_sum / l
-    print('success')
     for asset in assets_all:
         if len(assets_all[asset]['details']) > 0:
             for t in assets_all[asset]['details']:
@@ -306,6 +318,8 @@ def getasset():
             for t in assets_all[asset]['title']:
                 fi = assets_all[asset]['title'][t]
                 assets_all[asset]['title'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
+        if assets_all[asset]['state'] == 2:
+            assets_now[asset] = assets_all[asset]
     global area_sort
     global price_sort
     global year_sort
@@ -313,6 +327,7 @@ def getasset():
     global second
     global third
     global forth
+
     area_sort = sorted(assets_now.items(), key=lambda x: x[1]['area'])
     price_sort = sorted(assets_now.items(), key=lambda x: x[1]['price'])
     year_sort = sorted(assets_now.items(), key=lambda x: x[1]['year'])
@@ -324,6 +339,7 @@ def getasset():
     global area_list
     global price_list
     global year_list
+
     area_list = {
         0: [0, area_sort[first][1]["area"]],
         1: [(0 + area_sort[first][1]["area"]) / 2,
@@ -482,14 +498,15 @@ def get_user_matrix():
     global room_max
     global bathroom_max
     global garage_max
-    print(search)
-    print(actions_user)
+    # print(search)
+    # print(actions_user)
     # print(popularity_user)
     # print(preference)
 
     for user in search:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
+                            'year': {}, 'garage': {}, 'description': {}}
         for record in search[user]:
             matrix[user]['time'] = matrix[user]['time'] + search_worth
             if 'location' in record:
@@ -497,12 +514,14 @@ def get_user_matrix():
                     if record['location']['subregion'] not in matrix[user]['subregion']:
                         matrix[user]['subregion'][record['location']['subregion']] = 0
                     matrix[user]['subregion'][record['location']['subregion']] = matrix[user]['subregion'][
-                                                                                     record['location']['subregion']] + search_worth
+                                                                                     record['location'][
+                                                                                         'subregion']] + search_worth
             if 'info' in record:
                 if 'type' in record['info']:
                     if record['info']['type'] not in matrix[user]['type']:
                         matrix[user]['type'][record['info']['type']] = 0
-                    matrix[user]['type'][record['info']['type']] = matrix[user]['type'][record['info']['type']] + search_worth
+                    matrix[user]['type'][record['info']['type']] = matrix[user]['type'][
+                                                                       record['info']['type']] + search_worth
 
                 if 'area' in record['info']:
                     min = getstate(area_sort, record['info']['area'][0], 'area')
@@ -523,12 +542,14 @@ def get_user_matrix():
                 if 'room' in record['info']:
                     if record['info']['room'] not in matrix[user]['room']:
                         matrix[user]['room'][record['info']['room']] = 0
-                    matrix[user]['room'][record['info']['room']] = matrix[user]['room'][record['info']['room']] + search_worth
+                    matrix[user]['room'][record['info']['room']] = matrix[user]['room'][
+                                                                       record['info']['room']] + search_worth
 
                 if 'bathroom' in record['info']:
                     if record['info']['bathroom'] not in matrix[user]['bathroom']:
                         matrix[user]['bathroom'][record['info']['bathroom']] = 0
-                    matrix[user]['bathroom'][record['info']['bathroom']] = matrix[user]['bathroom'][record['info']['bathroom']] + search_worth
+                    matrix[user]['bathroom'][record['info']['bathroom']] = matrix[user]['bathroom'][record['info'][
+                        'bathroom']] + search_worth
 
                 if 'year' in record['info']:
                     min = getstate(area_sort, record['info']['year'][0], 'price')
@@ -541,29 +562,28 @@ def get_user_matrix():
                 if 'garage' in record['info']:
                     if record['info']['garage'] not in matrix[user]['garage']:
                         matrix[user]['garage'][record['info']['garage']] = 0
-                    matrix[user]['garage'][record['info']['garage']] = matrix[user]['garage'][record['info']['garage']] + search_worth
+                    matrix[user]['garage'][record['info']['garage']] = matrix[user]['garage'][
+                                                                           record['info']['garage']] + search_worth
 
     for user in actions_user:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {},
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
+                            'year': {},
                             'garage': {}, 'description': {}}
         for asset in actions_user[user]:
-            matrix[user]['time'] = matrix[user]['time'] + actions_user[user][asset]
             matrix = analysis_asset(matrix, asset, user, actions_user[user][asset])
 
     for user in matrix:
         for asset in popularity_user[user]:
-            matrix[user]['time'] = matrix[user]['time'] + favorite_worth
             matrix = analysis_asset(matrix, asset, user, favorite_worth)
         if user not in user_new:
-            matrix[user]['time'] = matrix[user]['time'] + preference_worth
             matrix = analysis_preference(matrix, preference_user, user, preference_worth)
 
     for user in user_new:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {},
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
+                            'year': {},
                             'garage': {}, 'description': {}}
-        matrix[user]['time'] = matrix[user]['time'] + preference_worth
         matrix = analysis_preference(matrix, preference_user, user, preference_worth)
 
     global user_feature
@@ -590,7 +610,8 @@ def get_user_matrix():
                 matrix[user]['area'][area] = matrix[user]['area'][area] / matrix[user]['time']
             area_user_sort = sorted(matrix[user]['area'], key=matrix[user]['area'].get, reverse=True)
             user_feature[user]["area"] = area_user_sort[0]
-            if len(area_user_sort) > 1 and matrix[user]['area'][area_user_sort[1]] > matrix[user]['area'][area_user_sort[0]] - 0.15:
+            if len(area_user_sort) > 1 and matrix[user]['area'][area_user_sort[1]] > matrix[user]['area'][
+                area_user_sort[0]] - 0.15:
                 user_feature[user]["area"] = (area_user_sort[0] + area_user_sort[0]) / 2
 
         if len(matrix[user]['price']) > 0:
@@ -598,7 +619,8 @@ def get_user_matrix():
                 matrix[user]['price'][price] = matrix[user]['price'][price] / matrix[user]['time']
             price_user_sort = sorted(matrix[user]['price'], key=matrix[user]['price'].get, reverse=True)
             user_feature[user]["price"] = price_user_sort[0]
-            if len(price_user_sort) > 1 and matrix[user]['price'][price_user_sort[1]] > matrix[user]['price'][price_user_sort[0]] - 0.15:
+            if len(price_user_sort) > 1 and matrix[user]['price'][price_user_sort[1]] > matrix[user]['price'][
+                price_user_sort[0]] - 0.15:
                 user_feature[user]["price"] = (price_user_sort[0] + price_user_sort[0]) / 2
 
         if len(matrix[user]['room']) > 0:
@@ -617,7 +639,8 @@ def get_user_matrix():
                 matrix[user]['bathroom'][bathroom] = matrix[user]['bathroom'][bathroom] / matrix[user]['time']
             bathroom_sort = sorted(matrix[user]['bathroom'], key=matrix[user]['bathroom'].get, reverse=True)
             user_feature[user]["bathroom"] = bathroom_sort[0]
-            if len(bathroom_sort) > 1 and matrix[user]['bathroom'][bathroom_sort[1]] > matrix[user]['bathroom'][bathroom_sort[0]] - 0.15:
+            if len(bathroom_sort) > 1 and matrix[user]['bathroom'][bathroom_sort[1]] > matrix[user]['bathroom'][
+                bathroom_sort[0]] - 0.15:
                 if bathroom_sort[1] < bathroom_sort[0]:
                     user_feature[user]["bathroom"] = bathroom_sort[1]
                 else:
@@ -630,7 +653,8 @@ def get_user_matrix():
                 matrix[user]['garage'][garage] = matrix[user]['garage'][garage] / matrix[user]['time']
             garage_sort = sorted(matrix[user]['garage'], key=matrix[user]['garage'].get, reverse=True)
             user_feature[user]["garage"] = garage_sort[0]
-            if len(garage_sort) > 1 and matrix[user]['garage'][garage_sort[1]] > matrix[user]['garage'][garage_sort[0]] - 0.15:
+            if len(garage_sort) > 1 and matrix[user]['garage'][garage_sort[1]] > matrix[user]['garage'][
+                garage_sort[0]] - 0.15:
                 if garage_sort[1] < garage_sort[0]:
                     user_feature[user]["garage"] = garage_sort[1]
                 else:
@@ -643,7 +667,8 @@ def get_user_matrix():
                 matrix[user]['year'][year] = matrix[user]['year'][year] / matrix[user]['time']
             year_user_sort = sorted(matrix[user]['year'], key=matrix[user]['year'].get, reverse=True)
             user_feature[user]["year"] = year_user_sort[0]
-            if len(year_user_sort) > 1 and matrix[user]['year'][year_user_sort[1]] > matrix[user]['year'][year_user_sort[0]] - 0.15:
+            if len(year_user_sort) > 1 and matrix[user]['year'][year_user_sort[1]] > matrix[user]['year'][
+                year_user_sort[0]] - 0.15:
                 user_feature[user]["year"] = (year_user_sort[0] + year_user_sort[0]) / 2
 
         user_feature[user]["words"] = []
@@ -675,6 +700,7 @@ def getstate(list, num, attribute):
 
 
 def analysis_preference(matrix, preference, user, time):
+    matrix[user]['time'] = matrix[user]['time'] + time
     if 'asset_types' in preference[user]:
         for t in preference[user]['asset_types']:
             if t not in matrix[user]['type']:
@@ -684,7 +710,8 @@ def analysis_preference(matrix, preference, user, time):
     if 'location' in preference[user]:
         if preference[user]['location'] not in matrix[user]['subregion']:
             matrix[user]['subregion'][preference[user]['location']] = 0
-        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][preference[user]['location']] + time
+        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][
+                                                                      preference[user]['location']] + time
 
     if 'area_range' in preference[user]:
         min = getstate(area_sort, preference[user]['area_range'][0], 'area')
@@ -705,12 +732,14 @@ def analysis_preference(matrix, preference, user, time):
     if 'room_num_range' in preference[user]:
         if preference[user]['room_num_range'][0] not in matrix[user]['room']:
             matrix[user]['room'][preference[user]['room_num_range'][0]] = 0
-        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][preference[user]['room_num_range'][0]] + time
+        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][
+                                                                          preference[user]['room_num_range'][0]] + time
 
     if 'bathroom_num_range' in preference[user]:
         if preference[user]['bathroom_num_range'][0] not in matrix[user]['bathroom']:
             matrix[user]['bathroom'][preference[user]['bathroom_num_range'][0]] = 0
-        matrix[user]['bathroom'][preference[user]['bathroom_num_range'][0]] = matrix[user]['bathroom'][preference[user]['bathroom_num_range'][0]] + time
+        matrix[user]['bathroom'][preference[user]['bathroom_num_range'][0]] = matrix[user]['bathroom'][preference[user][
+            'bathroom_num_range'][0]] + time
 
     if 'built_year_range' in preference[user]:
         min = getstate(year_sort, preference[user]['built_year_range'][0], 'price')
@@ -723,15 +752,19 @@ def analysis_preference(matrix, preference, user, time):
     if 'garage_num_range' in preference[user]:
         if preference[user]['garage_num_range'][0] not in matrix[user]['garage']:
             matrix[user]['garage'][preference[user]['garage_num_range'][0]] = 0
-        matrix[user]['garage'][preference[user]['garage_num_range'][0]] = matrix[user]['garage'][preference[user]['garage_num_range'][0]] + time
+        matrix[user]['garage'][preference[user]['garage_num_range'][0]] = matrix[user]['garage'][
+                                                                              preference[user]['garage_num_range'][
+                                                                                  0]] + time
     return matrix
 
 
 def analysis_asset(matrix, asset, user, time):
+    matrix[user]['time'] = matrix[user]['time'] + time
     if 'subregion' in assets_all[asset]:
         if assets_all[asset]['subregion'] not in matrix[user]['subregion']:
             matrix[user]['subregion'][assets_all[asset]['subregion']] = 0
-        matrix[user]['subregion'][assets_all[asset]['subregion']] = matrix[user]['subregion'][assets_all[asset]['subregion']] + time
+        matrix[user]['subregion'][assets_all[asset]['subregion']] = matrix[user]['subregion'][
+                                                                        assets_all[asset]['subregion']] + time
 
     if assets_all[asset]['type'] not in matrix[user]['type']:
         matrix[user]['type'][assets_all[asset]['type']] = 0
@@ -753,7 +786,8 @@ def analysis_asset(matrix, asset, user, time):
 
     if assets_all[asset]['bathroom'] not in matrix[user]['bathroom']:
         matrix[user]['bathroom'][assets_all[asset]['bathroom']] = 0
-    matrix[user]['bathroom'][assets_all[asset]['bathroom']] = matrix[user]['bathroom'][assets_all[asset]['bathroom']] + time
+    matrix[user]['bathroom'][assets_all[asset]['bathroom']] = matrix[user]['bathroom'][
+                                                                  assets_all[asset]['bathroom']] + time
 
     year_state = getstate(year_sort, assets_all[asset]['year'], 'year')
     if year_state not in matrix[user]['year']:
@@ -777,7 +811,7 @@ def analysis_asset(matrix, asset, user, time):
 
 
 @application.route('/usermatrix')
-def user_asset_matrix():
+def get_user_asset_matrix():
     global recommend_user_asset
     if len(user_feature) < 1000:
         for user in user_feature:
@@ -796,7 +830,7 @@ def user_asset_matrix():
                 result[asset] = result[asset] * 1.2
             if user_feature[user]["city_second"] is not None:
                 location = {'subregion': user_feature[user]["city_second"]}
-                result.append(ir(location, info))
+                result.update(ir(location, info))
             recommend_user_asset[user] = sorted(result, key=result.get, reverse=True)
     else:
         user_interest = {}
@@ -885,23 +919,27 @@ def get_agent_matrix():
     matrix = {}
     for agent in preference_agent:
         if agent not in matrix:
-            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
+                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
         matrix = analysis_preference(matrix, preference_agent, agent, 1000)
     for agent in agent_asset:
         if agent not in matrix:
-            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
+                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
         for asset in agent_asset[agent]:
             matrix = analysis_asset(matrix, asset, agent, 100)
+        
     for agent in matrix:
+        agent_feature[agent] = {}
         if len(matrix[agent]['subregion']) > 0:
             for city in matrix[agent]['subregion']:
                 matrix[agent]['subregion'][city] = matrix[agent]['subregion'][city] / matrix[agent]['time']
             city_sort = sorted(matrix[agent]['subregion'], key=matrix[agent]['subregion'].get, reverse=True)
-            user_feature[agent]["city_first"] = city_sort[0]
+            agent_feature[agent]["city_first"] = city_sort[0]
             if len(city_sort) > 1 and matrix[agent]['subregion'][city_sort[1]] > 0.1:
-                user_feature[agent]["city_second"] = city_sort[1]
+                agent_feature[agent]["city_second"] = city_sort[1]
             else:
-                user_feature[agent]["city_second"] = None
+                agent_feature[agent]["city_second"] = None
 
         if len(matrix[agent]['type']) > 0:
             for asset_type in matrix[agent]['type']:
@@ -914,7 +952,8 @@ def get_agent_matrix():
                 matrix[agent]['area'][area] = matrix[agent]['area'][area] / matrix[agent]['time']
             area_user_sort = sorted(matrix[agent]['area'], key=matrix[agent]['area'].get, reverse=True)
             agent_feature[agent]["area"] = area_user_sort[0]
-            if len(area_user_sort) > 1 and matrix[agent]['area'][area_user_sort[1]] > matrix[agent]['area'][area_user_sort[0]] - 0.15:
+            if len(area_user_sort) > 1 and matrix[agent]['area'][area_user_sort[1]] > matrix[agent]['area'][
+                area_user_sort[0]] - 0.15:
                 agent_feature[agent]["area"] = (area_user_sort[0] + area_user_sort[0]) / 2
 
         if len(matrix[agent]['price']) > 0:
@@ -922,7 +961,8 @@ def get_agent_matrix():
                 matrix[agent]['price'][price] = matrix[agent]['price'][price] / matrix[agent]['time']
             price_user_sort = sorted(matrix[agent]['price'], key=matrix[agent]['price'].get, reverse=True)
             agent_feature[agent]["price"] = price_user_sort[0]
-            if len(price_user_sort) > 1 and matrix[agent]['price'][price_user_sort[1]] > matrix[agent]['price'][price_user_sort[0]] - 0.15:
+            if len(price_user_sort) > 1 and matrix[agent]['price'][price_user_sort[1]] > matrix[agent]['price'][
+                price_user_sort[0]] - 0.15:
                 agent_feature[agent]["price"] = (price_user_sort[0] + price_user_sort[0]) / 2
 
         if len(matrix[agent]['room']) > 0:
@@ -939,7 +979,8 @@ def get_agent_matrix():
                 matrix[agent]['bathroom'][bathroom] = matrix[agent]['bathroom'][bathroom] / matrix[agent]['time']
             bathroom_sort = sorted(matrix[agent]['bathroom'], key=matrix[agent]['bathroom'].get, reverse=True)
             agent_feature[agent]["bathroom"] = bathroom_sort[0]
-            if len(bathroom_sort) > 1 and matrix[agent]['bathroom'][bathroom_sort[1]] > matrix[agent]['bathroom'][bathroom_sort[0]] - 0.15:
+            if len(bathroom_sort) > 1 and matrix[agent]['bathroom'][bathroom_sort[1]] > matrix[agent]['bathroom'][
+                bathroom_sort[0]] - 0.15:
                 if bathroom_sort[1] < bathroom_sort[0]:
                     agent_feature[agent]["bathroom"] = bathroom_sort[1]
                 else:
@@ -950,7 +991,8 @@ def get_agent_matrix():
                 matrix[agent]['garage'][garage] = matrix[agent]['garage'][garage] / matrix[agent]['time']
             garage_sort = sorted(matrix[agent]['garage'], key=matrix[agent]['garage'].get, reverse=True)
             agent_feature[agent]["garage"] = garage_sort[0]
-            if len(garage_sort) > 1 and matrix[agent]['garage'][garage_sort[1]] > matrix[agent]['garage'][garage_sort[0]] - 0.15:
+            if len(garage_sort) > 1 and matrix[agent]['garage'][garage_sort[1]] > matrix[agent]['garage'][
+                garage_sort[0]] - 0.15:
                 if garage_sort[1] < garage_sort[0]:
                     agent_feature[agent]["garage"] = garage_sort[1]
                 else:
@@ -961,13 +1003,14 @@ def get_agent_matrix():
                 matrix[agent]['year'][year] = matrix[agent]['year'][year] / matrix[agent]['time']
             year_user_sort = sorted(matrix[agent]['year'], key=matrix[agent]['year'].get, reverse=True)
             agent_feature[agent]["year"] = year_user_sort[0]
-            if len(year_user_sort) > 1 and matrix[agent]['year'][year_user_sort[1]] > matrix[agent]['year'][year_user_sort[0]] - 0.15:
+            if len(year_user_sort) > 1 and matrix[agent]['year'][year_user_sort[1]] > matrix[agent]['year'][
+                year_user_sort[0]] - 0.15:
                 agent_feature[agent]["year"] = (year_user_sort[0] + year_user_sort[0]) / 2
 
     return matrix
 
 
-def user_agent_matrix():
+def get_user_agent_matrix():
     for user in user_feature:
         rec = {}
         for agent in agent_feature:
@@ -975,7 +1018,7 @@ def user_agent_matrix():
         recommend_user_agent[user] = sorted(rec, key=rec.get, reverse=True)
 
 
-def agent_asset_matrix():
+def get_agent_asset_matrix():
     for agent in agent_feature:
         location = {'subregion': user_feature[agent]["city_first"]}
         info = {'type': user_feature[agent]["type"],
@@ -992,35 +1035,88 @@ def agent_asset_matrix():
             result[asset] = result[asset] * 1.2
         if user_feature[agent]["city_second"] is not None:
             location = {'subregion': user_feature[agent]["city_second"]}
-            result.append(ir(location, info))
+            result.update(ir(location, info))
         recommend_agent_asset[agent] = sorted(result, key=result.get, reverse=True)
 
 
-def asset_agent_matrix():
+def get_asset_agent_matrix():
     for asset in assets_now:
         result = {}
         for agent in agent_feature:
             if agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']:
                 result[agent] = 0
-                if assets_now[asset]['type'] == 7 or agent['type'] == assets_now[asset]['type']:
+                if assets_now[asset]['type'] == 7 or agent_feature[agent]['type'] == assets_now[asset]['type']:
                     result[agent] = result[agent] + 1
 
-                if area_list[agent_feature[agent]['area'] * 2][1] > assets_now[asset]['area'] > area_list[agent_feature[agent]['area'] * 2][0]:
+                if area_list[agent_feature[agent]['area'] * 2][1] > assets_now[asset]['area'] > \
+                        area_list[agent_feature[agent]['area'] * 2][0]:
                     result[agent] = result[agent] + 1
 
-                if price_list[agent_feature[agent]['price']][1] > assets_now[asset]['price'] > price_list[agent_feature[agent]['price']][0]:
+                if price_list[agent_feature[agent]['price']][1] > assets_now[asset]['price'] > \
+                        price_list[agent_feature[agent]['price']][0]:
                     result[agent] = result[agent] + 1
 
-                if assets_now[asset]['room'] >= agent['room']:
+                if assets_now[asset]['room'] >= agent_feature[agent]['room']:
                     result[agent] = result[agent] + 1
-                if assets_now[asset]['bathroom']>= agent['bathroom']:
+                if assets_now[asset]['bathroom'] >= agent_feature[agent]['bathroom']:
                     result[agent] = result[agent] + 1
-                if assets_now[asset]['garage'] >= agent['garage']:
+                if assets_now[asset]['garage'] >= agent_feature[agent]['garage']:
                     result[agent] = result[agent] + 1
 
-                if year_list[agent_feature[agent]['year']][1] > assets_now[asset]['year'] > price_list[agent_feature[agent]['year']][0]:
+                if year_list[agent_feature[agent]['year']][1] > assets_now[asset]['year'] > \
+                        price_list[agent_feature[agent]['year']][0]:
                     result[agent] = result[agent] + 1
         recommend_asset_agent[asset] = sorted(result, key=result.get)
+
+
+@application.route('/getrelevantassets')
+def get_asset_asset():
+    asset = 0
+    if request.method == "POST":
+        asset = int(request.form.get('asset'))
+    location = {
+        'longitude': assets_now[asset]['longitude'],
+        'latitude': assets_now[asset]['latitude'],
+        'region': assets_now[asset]['region'],
+        'subregion': assets_now[asset]['subregion'],
+        'street': assets_now[asset]['street']
+    }
+    area_range = [2147483647, 0]
+    for range in area_list:
+        if area_list[range][1] > assets_now[asset]['area'] > area_list[range][0]:
+            if area_range[0] > area_list[range][0]:
+                area_range[0] = area_list[range][0]
+            if area_range[1] < area_list[range][1]:
+                area_range[1] = area_list[range][1]
+
+    price_range = [2147483647, 0]
+    for range in price_list:
+        if price_list[range][1] > assets_now[asset]['price'] > price_list[range][0]:
+            if price_range[0] > price_list[range][0]:
+                price_range[0] = price_list[range][0]
+            if price_range[1] < price_list[range][1]:
+                price_range[1] = price_list[range][1]
+
+    year_range = [2147483647, 0]
+    for range in year_list:
+        if year_list[range][1] > assets_now[asset]['area'] > year_list[range][0]:
+            if year_range[0] > year_list[range][0]:
+                year_range[0] = year_list[range][0]
+            if year_range[1] < year_list[range][1]:
+                year_range[1] = year_list[range][1]
+
+    info = {
+        'type': assets_now[asset]['type'],
+        'area': area_range,
+        'price': price_range,
+        'room': assets_now[asset]['room'],
+        'bathroom': assets_now[asset]['bathroom'],
+        'garage': assets_now[asset]['garage'],
+        'year_built': year_range,
+        'description': assets_now[asset]['details']
+    }
+    result = ir(location, info)
+    return sorted(result, key=result.get, reverse=True)
 
 
 @application.route('/recommendagenttouser')
@@ -1053,6 +1149,18 @@ def recommend_asset_to_agent():
 
 @application.route('/recommendagenttoasset')
 def recommend_agent_to_asset():
+    asset = 0
+    if request.method == "POST":
+        asset = int(request.form.get('asset'))
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data": recommend_asset_agent[asset]
+    })
+
+
+@application.route('/recommendassettoasset')
+def recommend_asset_to_asset():
     asset = 0
     if request.method == "POST":
         asset = int(request.form.get('asset'))
@@ -1100,7 +1208,7 @@ def ir(location, info):
     result = {}
     query = []
     if info is not None:
-        if len(info['details']) > 0:
+        if 'details' in info and len(info['details']) > 0:
             info['details'] = info['details'].strip().lower()
             info['details'] = re.split('[^a-z|0-9]', str(info['details']))
             info['details'] = [x for x in info['details'] if x != '']
@@ -1117,69 +1225,74 @@ def ir(location, info):
     time_min = 2147483647
     for asset in assets_now:
         if location['subregion'] == assets_now[asset]['subregion']:
-            result[asset] = {}
-            result[asset]['distance'] = sqrt(pow((location['longitude'] - assets_now[asset]['longitude']), 2) + pow((location['latitude'] - assets_now[asset]['latitude']), 2))
+            result[asset] = {'distance': 0.0, 'match': 0, 'details': 0, 'time': 0, 'pop': 0}
+            if 'longitude' in location and 'latitude' in location:
+                result[asset]['distance'] = sqrt(pow((location['longitude'] - assets_now[asset]['longitude']), 2) +
+                                                 pow((location['latitude'] - assets_now[asset]['latitude']), 2))
 
-            if result[asset]['distance'] > dis_max:
-                dis_max = result[asset]['distance']
-            if result[asset]['distance'] < dis_min:
-                dis_min = result[asset]['distance']
+                if result[asset]['distance'] > dis_max:
+                    dis_max = result[asset]['distance']
+                if result[asset]['distance'] < dis_min:
+                    dis_min = result[asset]['distance']
 
             # matching degree
-            result[asset]['match'] = 0
-            if len(location['subregion']) > 0:
+            if 'subregion' in location:
                 if location['subregion'] == assets_now[asset]['subregion']:
                     result[asset]['match'] = result[asset]['match'] + 1
-            if len(location['street']) > 0:
+            if 'street' in location:
                 if location['street'] == assets_now[asset]['street']:
                     result[asset]['match'] = result[asset]['match'] + 1
 
             if info is not None:
                 # matching degree
-                if info['type'] == 7 or info['type'] == assets_now[asset]['type']:
+                if 'type' in info and info['type'] == assets_now[asset]['type']:
                     result[asset]['match'] = result[asset]['match'] + 1
 
-                if info['area'][1] > area_max:
-                    info['area'][1] = area_max
-                elif info['area'][0] < area_min:
-                    info['area'][0] = area_min
-                if info['area'][1] > assets_now[asset]['area'] > info['area'][0]:
-                    result[asset]['match'] = result[asset]['match'] + 1
+                if 'area' in info:
+                    if info['area'][1] > area_max:
+                        info['area'][1] = area_max
+                    elif info['area'][0] < area_min:
+                        info['area'][0] = area_min
+                    if info['area'][1] > assets_now[asset]['area'] > info['area'][0]:
+                        result[asset]['match'] = result[asset]['match'] + 2
 
-                if info['price'][1] > price_max:
-                    info['price'][1] = price_max
-                elif info['price'][0] < price_min:
-                    info['price'][0] = price_min
-                if info['price'][1] > assets_now[asset]['price'] > info['price'][0]:
-                    result[asset]['match'] = result[asset]['match'] + 1
+                if 'price' in info:
+                    if info['price'][1] > price_max:
+                        info['price'][1] = price_max
+                    elif info['price'][0] < price_min:
+                        info['price'][0] = price_min
+                    if info['price'][1] > assets_now[asset]['price'] > info['price'][0]:
+                        result[asset]['match'] = result[asset]['match'] + 2
 
-                if info['year'][1] > year_max:
-                    info['year'][1] = year_max
-                elif info['year'][0] < year_min:
-                    info['year'][0] = year_min
-                if info['year'][1] > assets_now[asset]['year'] > info['year'][0]:
-                    result[asset]['match'] = result[asset]['match'] + 1
+                if 'year' in info:
+                    if info['year'][1] > year_max:
+                        info['year'][1] = year_max
+                    elif info['year'][0] < year_min:
+                        info['year'][0] = year_min
+                    if info['year'][1] > assets_now[asset]['year'] > info['year'][0]:
+                        result[asset]['match'] = result[asset]['match'] + 1
 
-                if assets_now[asset]['room'] > info['room']:
+                if 'room' in info and assets_now[asset]['room'] > info['room']:
                     result[asset]['match'] = result[asset]['match'] + 1
-                if assets_now[asset]['bathroom'] > info['bathroom']:
+                if 'bathroom' in info and assets_now[asset]['bathroom'] > info['bathroom']:
                     result[asset]['match'] = result[asset]['match'] + 1
-                if assets_now[asset]['garage'] > info['garage']:
+                if 'garage' in info and assets_now[asset]['garage'] > info['garage']:
                     result[asset]['match'] = result[asset]['match'] + 1
                 res = 0
-                if len(assets_now[asset]['details']) > 0:
-                    print(assets_now[asset]['details'])
-                    for q in query:
-                        if q in assets_now[asset]['details']:
-                            res = res + assets_now[asset]['details'][q]
-                if len(assets_now[asset]['title']) > 0:
-                    print(assets_now[asset]['title'])
-                    for q in query:
-                        if q in assets_now[asset]['title']:
-                            res = res + (assets_now[asset]['title'][q]) * 2
-                if res > det_max:
-                    det_max = res
-                result[asset]['details'] = res
+                if 'details' in info:
+                    if len(assets_now[asset]['details']) > 0:
+                        print(assets_now[asset]['details'])
+                        for q in query:
+                            if q in assets_now[asset]['details']:
+                                res = res + assets_now[asset]['details'][q]
+                    if len(assets_now[asset]['title']) > 0:
+                        print(assets_now[asset]['title'])
+                        for q in query:
+                            if q in assets_now[asset]['title']:
+                                res = res + (assets_now[asset]['title'][q]) * 2
+                    if res > det_max:
+                        det_max = res
+                    result[asset]['details'] = res
 
             result[asset]['time'] = (datetime.datetime.now() - assets_now[asset]['time']).total_seconds()
             if result[asset]['time'] > time_max:
@@ -1189,18 +1302,26 @@ def ir(location, info):
 
     sort = sorted(popularity_value, key=popularity_value.get, reverse=True)
     for i in result:
-        result[i]["distance"] = 1 - ((result[i]["distance"] - dis_min) / (dis_max - dis_min))
+        if dis_max > dis_min:
+            result[i]["distance"] = 1 - ((result[i]["distance"] - dis_min) / (dis_max - dis_min))
+        else:
+            result[i]["distance"] = 0
         result[i]['match'] = result[i]["match"] / 7
-        result[i]['details'] = result[i]['details'] / det_max
-        result[i]['time'] = 1 - ((result[i]["time"] - time_min) / (time_max - time_min))
+        if det_max > 0:
+            result[i]['details'] = result[i]['details'] / det_max
+        else:
+            result[i]['details'] = 0
+        if time_max > time_min:
+            result[i]['time'] = 1 - ((result[i]["time"] - time_min) / (time_max - time_min))
+        else:
+            result[i]['time'] = 0
         if popularity_value[sort[0]] > 0:
             result[i]['pop'] = popularity_value[i] / popularity_value[sort[0]]
         else:
             result[i]['pop'] = popularity_value[i] = 0
-        result[i] = result[i]["distance"] + result[i]['match'] + result[i]['details'] + result[i]['time'] + result[i]['pop']
+        result[i] = result[i]["distance"] + result[i]['match'] + result[i]['details'] + result[i]['time'] + result[i][
+            'pop']
     return result
-
-
 
 
 '''
