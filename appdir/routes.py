@@ -196,7 +196,7 @@ def getaction():
     result = client.query(query)
     for table in result:
         for record in table:
-            d = {'location': record['location'], 'info': record['info']}
+            d = {'location': record['location'], 'info': record['info'], 'asset_type': int(record['asset_type'])}
             if record['user'] not in search:
                 search[int(record['user'])] = []
             search[int(record['user'])].append(d)
@@ -250,6 +250,7 @@ def getasset():
             dic['street'] = asset.asset_location['features'][0]['properties']['street']
 
         dic['type'] = 7
+        dic['asset_type'] = asset.asset_type
         dic['area'] = 0
         dic['price'] = 0
         dic['room'] = 0
@@ -498,17 +499,19 @@ def get_user_matrix():
     global room_max
     global bathroom_max
     global garage_max
-    # print(search)
-    # print(actions_user)
-    # print(popularity_user)
-    # print(preference)
 
     for user in search:
         if user not in matrix:
             matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
-                            'year': {}, 'garage': {}, 'description': {}}
+                            'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         for record in search[user]:
             matrix[user]['time'] = matrix[user]['time'] + search_worth
+            if 'asset_type' in record:
+                if record['asset_type'] == 1:
+                    matrix[user]['asset_type']['buy'] = matrix[user]['asset_type']['buy'] + search_worth
+                else:
+                    matrix[user]['asset_type']['rent'] = matrix[user]['asset_type']['rent'] + search_worth
+
             if 'location' in record:
                 if 'subregion' in record['location']:
                     if record['location']['subregion'] not in matrix[user]['subregion']:
@@ -568,8 +571,7 @@ def get_user_matrix():
     for user in actions_user:
         if user not in matrix:
             matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
-                            'year': {},
-                            'garage': {}, 'description': {}}
+                            'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         for asset in actions_user[user]:
             matrix = analysis_asset(matrix, asset, user, actions_user[user][asset])
 
@@ -582,13 +584,18 @@ def get_user_matrix():
     for user in user_new:
         if user not in matrix:
             matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
-                            'year': {},
-                            'garage': {}, 'description': {}}
+                            'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         matrix = analysis_preference(matrix, preference_user, user, preference_worth)
 
     global user_feature
     for user in matrix:
         user_feature[user] = {}
+        if len(matrix[user]['asset_type']) > 0:
+            for asset_type in matrix[user]['asset_type']:
+                matrix[user]['asset_type'][asset_type] = matrix[user]['asset_type'][asset_type] / matrix[user]['time']
+            asset_type_sort = sorted(matrix[user]['asset_type'], key=matrix[user]['asset_type'].get, reverse=True)
+            user_feature[user]["asset_type"] = asset_type_sort[0]
+
         if len(matrix[user]['subregion']) > 0:
             for city in matrix[user]['subregion']:
                 matrix[user]['subregion'][city] = matrix[user]['subregion'][city] / matrix[user]['time']
@@ -701,6 +708,12 @@ def getstate(list, num, attribute):
 
 def analysis_preference(matrix, preference, user, time):
     matrix[user]['time'] = matrix[user]['time'] + time
+    if 'buy_house' in preference[user]:
+        if preference[user]['buy_house']:
+            matrix[user]['asset_type']['buy'] = matrix[user]['asset_type']['buy'] + time
+        else:
+            matrix[user]['asset_type']['rent'] = matrix[user]['asset_type']['rent'] + time
+
     if 'asset_types' in preference[user]:
         for t in preference[user]['asset_types']:
             if t not in matrix[user]['type']:
@@ -760,6 +773,12 @@ def analysis_preference(matrix, preference, user, time):
 
 def analysis_asset(matrix, asset, user, time):
     matrix[user]['time'] = matrix[user]['time'] + time
+    if 'asset_type' in assets_all[asset]:
+        if assets_all[asset]['asset_type'] == 1:
+            matrix[user]['asset_type']['buy'] = matrix[user]['asset_type']['buy'] + time
+        else:
+            matrix[user]['asset_type']['rent'] = matrix[user]['asset_type']['rent'] + time
+
     if 'subregion' in assets_all[asset]:
         if assets_all[asset]['subregion'] not in matrix[user]['subregion']:
             matrix[user]['subregion'][assets_all[asset]['subregion']] = 0
@@ -810,13 +829,17 @@ def analysis_asset(matrix, asset, user, time):
     return matrix
 
 
+# def analysis_matrix():
+
+
 @application.route('/usermatrix')
 def get_user_asset_matrix():
     global recommend_user_asset
     if len(user_feature) < 1000:
         for user in user_feature:
+            asset_type = user_feature[user]["asset_type"]
             location = {'subregion': user_feature[user]["city_first"]}
-            info = {'type': user_feature[user]["type"],
+            info = {'type': [user_feature[user]["type"]],
                     'area': area_list[user_feature[user]["area"] * 2],
                     'price': price_list[user_feature[user]["price"] * 2],
                     'room': user_feature[user]["room"],
@@ -825,12 +848,12 @@ def get_user_asset_matrix():
                     'year_built': year_list[user_feature[user]["year"] * 2]
                     # 'description': string
                     }
-            result = ir(location, info)
+            result = ir(location, info, asset_type)
             for asset in result:
                 result[asset] = result[asset] * 1.2
             if user_feature[user]["city_second"] is not None:
                 location = {'subregion': user_feature[user]["city_second"]}
-                result.update(ir(location, info))
+                result.update(ir(location, info, asset_type))
             recommend_user_asset[user] = sorted(result, key=result.get, reverse=True)
     else:
         user_interest = {}
@@ -920,17 +943,22 @@ def get_agent_matrix():
     for agent in preference_agent:
         if agent not in matrix:
             matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
-                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         matrix = analysis_preference(matrix, preference_agent, agent, 1000)
     for agent in agent_asset:
         if agent not in matrix:
             matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
-                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}}
+                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         for asset in agent_asset[agent]:
             matrix = analysis_asset(matrix, asset, agent, 100)
-        
+
     for agent in matrix:
         agent_feature[agent] = {}
+        if len(matrix[agent]['asset_type']) > 0:
+            for asset_type in matrix[agent]['asset_type']:
+                matrix[agent]['asset_type'][asset_type] = matrix[agent]['asset_type'][asset_type] / matrix[agent]['time']
+            asset_type_sort = sorted(matrix[agent]['asset_type'], key=matrix[agent]['asset_type'].get, reverse=True)
+            user_feature[agent]["asset_type"] = asset_type_sort[0]
         if len(matrix[agent]['subregion']) > 0:
             for city in matrix[agent]['subregion']:
                 matrix[agent]['subregion'][city] = matrix[agent]['subregion'][city] / matrix[agent]['time']
@@ -1020,8 +1048,9 @@ def get_user_agent_matrix():
 
 def get_agent_asset_matrix():
     for agent in agent_feature:
+        asset_type = user_feature[agent]['asset_type']
         location = {'subregion': user_feature[agent]["city_first"]}
-        info = {'type': user_feature[agent]["type"],
+        info = {'type': [user_feature[agent]["type"]],
                 'area': area_list[user_feature[agent]["area"] * 2],
                 'price': price_list[user_feature[agent]["price"] * 2],
                 'room': user_feature[agent]["room"],
@@ -1030,12 +1059,12 @@ def get_agent_asset_matrix():
                 'year_built': year_list[user_feature[agent]["year"] * 2]
                 # 'description': string
                 }
-        result = ir(location, info)
+        result = ir(location, info, asset_type)
         for asset in result:
             result[asset] = result[asset] * 1.2
         if user_feature[agent]["city_second"] is not None:
             location = {'subregion': user_feature[agent]["city_second"]}
-            result.update(ir(location, info))
+            result.update(ir(location, info, asset_type))
         recommend_agent_asset[agent] = sorted(result, key=result.get, reverse=True)
 
 
@@ -1106,7 +1135,7 @@ def get_asset_asset():
                 year_range[1] = year_list[range][1]
 
     info = {
-        'type': assets_now[asset]['type'],
+        'type': [assets_now[asset]['type']],
         'area': area_range,
         'price': price_range,
         'room': assets_now[asset]['room'],
@@ -1115,7 +1144,7 @@ def get_asset_asset():
         'year_built': year_range,
         'description': assets_now[asset]['details']
     }
-    result = ir(location, info)
+    result = ir(location, info, assets_now[asset]['asset_type'])
     return jsonify({
         "code": 200,
         "msg": "OK",
@@ -1168,10 +1197,12 @@ def retrieval():
     # get data
     location = None
     info = None
+    asset_type = 1
     if request.method == "POST":
         location = json.loads(request.form.get('location'))
         info = json.loads(request.form.get('info'))
-    result = ir(location, info)
+        asset_type = int(request.form.get('asset_type'))
+    result = ir(location, info, asset_type)
     return jsonify({
         "code": 200,
         "msg": "OK",
@@ -1179,24 +1210,26 @@ def retrieval():
     })
 
 
-def ir(location, info):
-    """
-    location:
-    'longitude': float
-    'latitude': float
-    'region': string
-    'subregion': string
-    'street': string
-    info:
-    'type': int
-    'area': [min, max]
-    'price': [min, max]
-    'room': int
-    'bathroom': int
-    'garage': int
-    'year_built' [min, max]
-    'description': string
-    """
+def ir(location, info, asset_type):
+    '''
+    {
+        'longitude': float
+        'latitude': float
+        'region': string
+        'subregion': string
+        'street': string
+    }
+    {
+        'type': []
+        'area': [min, max]
+        'price': [min, max]
+        'room': int
+        'bathroom': int
+        'garage': int
+        'year_built'[min, max]
+        'description': string
+    }
+    '''
     result = {}
     query = []
     if info is not None:
@@ -1216,7 +1249,7 @@ def ir(location, info):
     time_max = 0
     time_min = 2147483647
     for asset in assets_now:
-        if location['subregion'] == assets_now[asset]['subregion']:
+        if location['subregion'] == assets_now[asset]['subregion'] and assets_now[asset]['asset_type'] == asset_type:
             result[asset] = {'distance': 0.0, 'match': 0, 'details': 0, 'time': 0, 'pop': 0}
             if 'longitude' in location and 'latitude' in location:
                 result[asset]['distance'] = sqrt(pow((location['longitude'] - assets_now[asset]['longitude']), 2) +
@@ -1237,7 +1270,7 @@ def ir(location, info):
 
             if info is not None:
                 # matching degree
-                if 'type' in info and info['type'] == assets_now[asset]['type']:
+                if 'type' in info and assets_now[asset]['type'] in info['type']:
                     result[asset]['match'] = result[asset]['match'] + 1
 
                 if 'area' in info:
