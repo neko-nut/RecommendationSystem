@@ -1069,7 +1069,7 @@ def get_asset_agent_matrix():
         recommend_asset_agent[asset] = sorted(result, key=result.get)
 
 
-@application.route('/getrelevantassets')
+@application.route('/getrelevantassets', methods=['GET', 'POST'])
 def get_asset_asset():
     asset = 0
     if request.method == "POST":
@@ -1116,10 +1116,14 @@ def get_asset_asset():
         'description': assets_now[asset]['details']
     }
     result = ir(location, info)
-    return sorted(result, key=result.get, reverse=True)
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data":sorted(result, key=result.get, reverse=True)
+    })
 
 
-@application.route('/recommendagenttouser')
+@application.route('/recommendagenttouser', methods=['GET', 'POST'])
 def recommend_agent_to_user():
     user = 0
     if request.method == "POST":
@@ -1131,7 +1135,7 @@ def recommend_agent_to_user():
     })
 
 
-@application.route('/recommendassettoagent')
+@application.route('/recommendassettoagent', methods=['GET', 'POST'])
 def recommend_asset_to_agent():
     agent = 0
     if request.method == "POST":
@@ -1147,20 +1151,8 @@ def recommend_asset_to_agent():
     })
 
 
-@application.route('/recommendagenttoasset')
+@application.route('/recommendagenttoasset', methods=['GET', 'POST'])
 def recommend_agent_to_asset():
-    asset = 0
-    if request.method == "POST":
-        asset = int(request.form.get('asset'))
-    return jsonify({
-        "code": 200,
-        "msg": "OK",
-        "data": recommend_asset_agent[asset]
-    })
-
-
-@application.route('/recommendassettoasset')
-def recommend_asset_to_asset():
     asset = 0
     if request.method == "POST":
         asset = int(request.form.get('asset'))
