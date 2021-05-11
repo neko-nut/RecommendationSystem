@@ -10,3 +10,7 @@ class Config(object):
     stopwords = os.path.join(basedir, 'static/stopwords.txt')
     zip = os.path.join(basedir, 'static/zip.txt')
     zips = os.path.join(basedir, 'static/zips.json')
+    user_agent = os.path.join(basedir, 'static/user_agent.txt')
+    user_asset = os.path.join(basedir, 'static/user_asset.txt')
+    asset_agent = os.path.join(basedir, 'static/asset_agent.txt')
+    agent_asset = os.path.join(basedir, 'static/agent_asset.txt')

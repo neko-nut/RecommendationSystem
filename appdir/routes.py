@@ -5,6 +5,9 @@ import math
 import re
 import time
 from math import sqrt
+import threading
+import time
+import joblib
 
 # external lib
 from flask import request, jsonify
@@ -20,6 +23,8 @@ from appdir.config import Config
 from appdir.models import Asset, User, Agent
 
 # MySQL
+from appdir.thread import myThread
+
 server = SSHTunnelForwarder(
     ('101.32.220.109', 22),
     ssh_username="root",
@@ -167,13 +172,17 @@ def init():
     print('get_user_agent_matrix', datetime.datetime.now())
     get_agent_asset_matrix()
     print('get_agent_asset_matrix', datetime.datetime.now())
+
+    joblib.dump(recommend_user_asset, Config.user_asset)
+    joblib.dump(recommend_user_agent, Config.user_agent)
+    joblib.dump(recommend_asset_agent, Config.asset_agent)
+    joblib.dump(recommend_agent_asset, Config.agent_asset)
     return jsonify({
         "code": 200,
         "msg": "OK"
     })
 
 
-@application.route('/getaction')
 def getaction():
     global actions
     global actions_user
@@ -181,22 +190,23 @@ def getaction():
     result = client.query(query)
     for table in result:
         for record in table:
-            if int(record['user']) not in actions_user:
-                actions_user[int(record['user'])] = {}
-            if int(record['asset']) not in actions_user[int(record['user'])]:
-                actions_user[int(record['user'])][int(record['asset'])] = 0
-            actions_user[int(record['user'])][int(record['asset'])] = actions_user[int(record['user'])][
-                                                                          int(record['asset'])] + record['duration']
-            if int(record['asset']) not in actions:
-                actions[int(record['asset'])] = 0
-            actions[int(record['asset'])] = actions[int(record['asset'])] + record['duration']
+            if int(record['user']) != 1017:
+                if int(record['user']) not in actions_user:
+                    actions_user[int(record['user'])] = {}
+                if int(record['asset']) not in actions_user[int(record['user'])]:
+                    actions_user[int(record['user'])][int(record['asset'])] = 0
+                actions_user[int(record['user'])][int(record['asset'])] = actions_user[int(record['user'])][
+                                                                              int(record['asset'])] + record['duration']
+                if int(record['asset']) not in actions:
+                    actions[int(record['asset'])] = 0
+                actions[int(record['asset'])] = actions[int(record['asset'])] + record['duration']
 
     global search
     query = "SELECT * FROM search WHERE time >= " + str(time.time_ns() - 31536000000000000)
     result = client.query(query)
     for table in result:
         for record in table:
-            d = {'location': record['location'], 'info': record['info'], 'asset_type': int(record['asset_type'])}
+            d = {'location': json.loads(record['location']), 'info': json.loads(record['info']), 'asset_type': int(record['asset_type'])}
             if record['user'] not in search:
                 search[int(record['user'])] = []
             search[int(record['user'])].append(d)
@@ -207,7 +217,6 @@ def getaction():
     })
 
 
-@application.route('/getasset')
 def getasset():
     # assets
     global assets_all
@@ -410,7 +419,6 @@ def wordsanalysis(words):
     return index
 
 
-@application.route('/getuserinfo')
 def getuserinfo():
     global popularity
     global user_new
@@ -431,7 +439,6 @@ def getuserinfo():
     })
 
 
-@application.route('/getpopularity')
 def getpopularity():
     global popularity_value
     pop_nom = minmax(popularity)
@@ -468,7 +475,6 @@ def minmax(dic):
     return dic
 
 
-@application.route('/getagent')
 def get_agent():
     agents = session.query(Agent).all()
     for agent in agents:
@@ -479,7 +485,6 @@ def get_agent():
     })
 
 
-@application.route('/usermatrix')
 def get_user_matrix():
     """
     1. region
@@ -755,8 +760,8 @@ def analysis_preference(matrix, preference, user, time):
             'bathroom_num_range'][0]] + time
 
     if 'built_year_range' in preference[user]:
-        min = getstate(year_sort, preference[user]['built_year_range'][0], 'price')
-        max = getstate(year_sort, preference[user]['built_year_range'][1], 'price')
+        min = getstate(year_sort, preference[user]['built_year_range'][0], 'year')
+        max = getstate(year_sort, preference[user]['built_year_range'][1], 'year')
         for i in range(min, max):
             if i not in matrix[user]['year']:
                 matrix[user]['year'][i] = 0
@@ -829,67 +834,69 @@ def analysis_asset(matrix, asset, user, time):
     return matrix
 
 
-# def analysis_matrix():
-
-
-@application.route('/usermatrix')
 def get_user_asset_matrix():
     global recommend_user_asset
-    if len(user_feature) < 1000:
-        for user in user_feature:
-            asset_type = user_feature[user]["asset_type"]
-            location = {'subregion': user_feature[user]["city_first"]}
-            info = {'type': [user_feature[user]["type"]],
-                    'area': area_list[user_feature[user]["area"] * 2],
-                    'price': price_list[user_feature[user]["price"] * 2],
-                    'room': user_feature[user]["room"],
-                    'bathroom': user_feature[user]["bathroom"],
-                    'garage': user_feature[user]["garage"],
-                    'year_built': year_list[user_feature[user]["year"] * 2]
-                    # 'description': string
-                    }
-            result = ir(location, info, asset_type)
-            for asset in result:
-                result[asset] = result[asset] * 1.2
-            if user_feature[user]["city_second"] is not None:
-                location = {'subregion': user_feature[user]["city_second"]}
-                result.update(ir(location, info, asset_type))
-            recommend_user_asset[user] = sorted(result, key=result.get, reverse=True)
-    else:
-        user_interest = {}
-        similar_user = {}
-        # user - asset
-        for user in actions_user:
+    user_interest = {}
+    similar_user = {}
+    # user - asset
+    for user in actions_user:
+        user_interest[user] = {}
+        for asset in actions_user[user]:
+            user_interest[user][asset] = actions_user[user][asset]
+    for user in popularity_user:
+        if user not in user_interest:
             user_interest[user] = {}
-            for asset in actions_user[user]:
-                user_interest[user][asset] = actions_user[user][asset]
-        for user in popularity_user:
-            if user not in user_interest:
-                user_interest[user] = {}
-            for asset in popularity_user[user]:
-                if asset not in user_interest[user]:
-                    user_interest[user][asset] = 0
-                user_interest[user][asset] = user_interest[user][asset] + 1000
-            # user - user
-            similar_user[user] = {}
-            for user2 in user_feature:
-                if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
-                    similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
-        for user in user_feature:
-            prefer = {}
-            rec = {}
-            for user2 in similar_user[user]:
-                if user2 in user_interest:
-                    for asset in user_interest[user2]:
-                        if asset not in prefer:
-                            prefer[asset] = 0
-                        prefer[asset] = prefer[asset] + (similar_user[user][user2] + 1) * user_interest[user2][asset]
-            for asset in prefer:
-                if asset in assets_now:
-                    rec[asset] = prefer[asset]
-                    if assets_now[asset]['time'] > datetime.datetime.now() - datetime.timedelta(days=30):
-                        rec[asset] = rec[asset] * 1.2
-            recommend_user_asset[user] = sorted(rec, key=rec.get, reverse=True)
+        for asset in popularity_user[user]:
+            if asset not in user_interest[user]:
+                user_interest[user][asset] = 0
+            user_interest[user][asset] = user_interest[user][asset] + 1000
+        # user - user
+        similar_user[user] = {}
+        for user2 in user_feature:
+            if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
+                similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
+
+    for user in user_feature:
+        prefer = {}
+        rec = {}
+        for user2 in similar_user[user]:
+            if user2 in user_interest:
+                for asset in user_interest[user2]:
+                    if user not in actions_user or asset not in actions_user[user]:
+                        if user not in popularity_user or asset not in popularity_user[user]:
+                            if asset not in prefer:
+                                prefer[asset] = 0
+                            prefer[asset] = prefer[asset] + (similar_user[user][user2] + 1) * user_interest[user2][asset]
+        for asset in prefer:
+            if asset in assets_now:
+                rec[asset] = prefer[asset]
+                if assets_now[asset]['time'] > datetime.datetime.now() - datetime.timedelta(days=30):
+                    rec[asset] = rec[asset] * 1.2
+        recommend_user_asset[user] = sorted(rec, key=rec.get, reverse=True)
+
+        asset_type = user_feature[user]["asset_type"]
+        location = {'subregion': user_feature[user]["city_first"]}
+        info = {'type': [user_feature[user]["type"]],
+                'area': area_list[user_feature[user]["area"] * 2],
+                'price': price_list[user_feature[user]["price"] * 2],
+                'room': user_feature[user]["room"],
+                'bathroom': user_feature[user]["bathroom"],
+                'garage': user_feature[user]["garage"],
+                'year_built': year_list[user_feature[user]["year"] * 2]
+                # 'description': string
+                }
+        result = ir(location, info, asset_type)
+        for asset in result:
+            result[asset] = result[asset] * 1.2
+        if user_feature[user]["city_second"] is not None:
+            location = {'subregion': user_feature[user]["city_second"]}
+            result.update(ir(location, info, asset_type))
+        res = sorted(result, key=result.get, reverse=True)
+        for id in res:
+            if id not in recommend_user_asset[user]:
+                if user not in actions_user or id not in actions_user[user]:
+                    if user not in popularity_user or id not in popularity_user[user]:
+                        recommend_user_asset[user].append(id)
 
 
 def cos_sim_user(sim1, sim2):
@@ -918,23 +925,6 @@ def cos_sim_user(sim1, sim2):
     if sim2['type'] == sim1['type']:
         sim_score = sim_score + 0.1
     return sim_score
-
-
-@application.route('/recommend', methods=['GET', 'POST'])
-def recommend():
-    user = 0
-    result = []
-    if request.method == "POST":
-        user = int(request.form.get('user'))
-    for asset in recommend_user_asset[user]:
-        if user not in actions_user or asset not in actions_user[user]:
-            if user not in popularity_user or asset not in popularity_user[user]:
-                result.append(asset)
-    return jsonify({
-        "code": 200,
-        "msg": "OK",
-        "data": result
-    })
 
 
 def get_agent_matrix():
@@ -1072,7 +1062,7 @@ def get_asset_agent_matrix():
     for asset in assets_now:
         result = {}
         for agent in agent_feature:
-            if agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']:
+            if asset not in agent_asset[agent] and agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']:
                 result[agent] = 0
                 if assets_now[asset]['type'] == 7 or agent_feature[agent]['type'] == assets_now[asset]['type']:
                     result[agent] = result[agent] + 1
@@ -1096,6 +1086,19 @@ def get_asset_agent_matrix():
                         price_list[agent_feature[agent]['year']][0]:
                     result[agent] = result[agent] + 1
         recommend_asset_agent[asset] = sorted(result, key=result.get)
+
+
+@application.route('/recommend', methods=['GET', 'POST'])
+def recommend():
+    user = 0
+    matrix = joblib.load(Config.user_asset)
+    if request.method == "POST":
+        user = int(request.form.get('user'))
+    return jsonify({
+        "code": 200,
+        "msg": "OK",
+        "data": matrix[user]
+    })
 
 
 @application.route('/getrelevantassets', methods=['GET', 'POST'])
@@ -1148,7 +1151,7 @@ def get_asset_asset():
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data":sorted(result, key=result.get, reverse=True)
+        "data": sorted(result, key=result.get, reverse=True)
     })
 
 
@@ -1157,10 +1160,11 @@ def recommend_agent_to_user():
     user = 0
     if request.method == "POST":
         user = int(request.form.get('user'))
+    matrix = joblib.load(Config.user_agent)
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": recommend_user_agent[user]
+        "data": matrix[user]
     })
 
 
@@ -1169,14 +1173,11 @@ def recommend_asset_to_agent():
     agent = 0
     if request.method == "POST":
         agent = int(request.form.get('agent'))
-    result = []
-    for asset in recommend_user_agent[agent]:
-        if asset not in agent_asset[agent]:
-            result.append(asset)
+    matrix = joblib.load(Config.asset_agent)
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": result
+        "data": matrix[agent]
     })
 
 
@@ -1185,10 +1186,11 @@ def recommend_agent_to_asset():
     asset = 0
     if request.method == "POST":
         asset = int(request.form.get('asset'))
+    matrix = joblib.load(Config.agent_asset)
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": recommend_asset_agent[asset]
+        "data": matrix[asset]
     })
 
 
