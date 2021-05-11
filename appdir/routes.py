@@ -146,7 +146,6 @@ second = 0
 third = 0
 forth = 0
 
-
 # init
 @application.route('/')
 def init():
@@ -1459,3 +1458,6 @@ def add():
     session.commit()
     return "success"
 '''
+
+with application.app_context():
+    init()
