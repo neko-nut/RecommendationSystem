@@ -8,6 +8,8 @@ from math import sqrt
 import threading
 import time
 import joblib
+import os
+
 
 # external lib
 from flask import request, jsonify
@@ -153,7 +155,7 @@ def init():
     print('getaction', datetime.datetime.now())
     getasset()
     print('getasset', datetime.datetime.now())
-    getuserinfo()
+    get_user()
     print('getuserinfo', datetime.datetime.now())
     getpopularity()
     print('getpopularity', datetime.datetime.now())
@@ -161,8 +163,6 @@ def init():
     print('get_user_matrix', datetime.datetime.now())
     get_user_asset_matrix()
     print('get_user_asset_matrix', datetime.datetime.now())
-    get_agent()
-    print('get_agent', datetime.datetime.now())
     get_agent_matrix()
     print('get_agent_matrix', datetime.datetime.now())
     get_asset_agent_matrix()
@@ -171,10 +171,17 @@ def init():
     print('get_user_agent_matrix', datetime.datetime.now())
     get_agent_asset_matrix()
     print('get_agent_asset_matrix', datetime.datetime.now())
-
+    if os.path.exists(Config.user_asset):
+        os.remove(Config.user_asset)
     joblib.dump(recommend_user_asset, Config.user_asset)
+    if os.path.exists(Config.user_agent):
+        os.remove(Config.user_agent)
     joblib.dump(recommend_user_agent, Config.user_agent)
+    if os.path.exists(Config.asset_agent):
+        os.remove(Config.asset_agent)
     joblib.dump(recommend_asset_agent, Config.asset_agent)
+    if os.path.exists(Config.agent_asset):
+        os.remove(Config.agent_asset)
     joblib.dump(recommend_agent_asset, Config.agent_asset)
     return jsonify({
         "code": 200,
@@ -362,7 +369,7 @@ def getasset():
         6: [area_sort[third][1]["area"], area_sort[forth][1]["area"]],
         7: [(area_sort[third][1]["area"] + area_sort[forth][1]["area"]) / 2,
             (area_sort[forth][1]["area"] + len(assets_all)) / 2],
-        9: [area_sort[third][1]["area"], len(assets_all)]
+        8: [area_sort[third][1]["area"], len(assets_all)]
     }
     price_list = {
         0: [0, price_sort[first][1]["price"]],
@@ -377,7 +384,7 @@ def getasset():
         6: [price_sort[third][1]["price"], price_sort[forth][1]["price"]],
         7: [(price_sort[third][1]["price"] + price_sort[forth][1]["price"]) / 2,
             (price_sort[forth][1]["price"] + len(assets_all)) / 2],
-        9: [price_sort[third][1]["price"], len(assets_all)]
+        8: [price_sort[third][1]["price"], len(assets_all)]
     }
     year_list = {
         0: [0, year_sort[first][1]["year"]],
@@ -392,7 +399,7 @@ def getasset():
         6: [year_sort[third][1]["year"], year_sort[forth][1]["year"]],
         7: [(year_sort[third][1]["year"] + year_sort[forth][1]["year"]) / 2,
             (year_sort[forth][1]["year"] + len(assets_all)) / 2],
-        9: [year_sort[third][1]["year"], len(assets_all)]}
+        8: [year_sort[third][1]["year"], len(assets_all)]}
 
     return jsonify({
         "code": 200,
@@ -418,12 +425,14 @@ def wordsanalysis(words):
     return index
 
 
-def getuserinfo():
+def get_user():
     global popularity
     global user_new
     global preference_user
     users = session.query(User).all()
     for user in users:
+        if user.user_role == 1:
+            preference_agent[user.user_id] = user.user_preference
         for asset in user.user_favorites:
             if asset not in popularity:
                 popularity[asset] = 0
@@ -474,14 +483,6 @@ def minmax(dic):
     return dic
 
 
-def get_agent():
-    agents = session.query(Agent).all()
-    for agent in agents:
-        preference_agent[agent.agent_id] = agents.agents_preference
-    return jsonify({
-        "code": 200,
-        "msg": "OK"
-    })
 
 
 def get_user_matrix():
@@ -849,6 +850,8 @@ def get_user_asset_matrix():
             if asset not in user_interest[user]:
                 user_interest[user][asset] = 0
             user_interest[user][asset] = user_interest[user][asset] + 1000
+
+    for user in user_feature:
         # user - user
         similar_user[user] = {}
         for user2 in user_feature:
@@ -947,7 +950,7 @@ def get_agent_matrix():
             for asset_type in matrix[agent]['asset_type']:
                 matrix[agent]['asset_type'][asset_type] = matrix[agent]['asset_type'][asset_type] / matrix[agent]['time']
             asset_type_sort = sorted(matrix[agent]['asset_type'], key=matrix[agent]['asset_type'].get, reverse=True)
-            user_feature[agent]["asset_type"] = asset_type_sort[0]
+            agent_feature[agent]["asset_type"] = asset_type_sort[0]
         if len(matrix[agent]['subregion']) > 0:
             for city in matrix[agent]['subregion']:
                 matrix[agent]['subregion'][city] = matrix[agent]['subregion'][city] / matrix[agent]['time']
@@ -1037,22 +1040,22 @@ def get_user_agent_matrix():
 
 def get_agent_asset_matrix():
     for agent in agent_feature:
-        asset_type = user_feature[agent]['asset_type']
-        location = {'subregion': user_feature[agent]["city_first"]}
-        info = {'type': [user_feature[agent]["type"]],
-                'area': area_list[user_feature[agent]["area"] * 2],
-                'price': price_list[user_feature[agent]["price"] * 2],
-                'room': user_feature[agent]["room"],
-                'bathroom': user_feature[agent]["bathroom"],
-                'garage': user_feature[agent]["garage"],
-                'year_built': year_list[user_feature[agent]["year"] * 2]
+        asset_type = agent_feature[agent]['asset_type']
+        location = {'subregion': agent_feature[agent]["city_first"]}
+        info = {'type': [agent_feature[agent]["type"]],
+                'area': area_list[agent_feature[agent]["area"] * 2],
+                'price': price_list[agent_feature[agent]["price"] * 2],
+                'room': agent_feature[agent]["room"],
+                'bathroom': agent_feature[agent]["bathroom"],
+                'garage': agent_feature[agent]["garage"],
+                'year_built': year_list[agent_feature[agent]["year"] * 2]
                 # 'description': string
                 }
         result = ir(location, info, asset_type)
         for asset in result:
             result[asset] = result[asset] * 1.2
-        if user_feature[agent]["city_second"] is not None:
-            location = {'subregion': user_feature[agent]["city_second"]}
+        if agent_feature[agent]["city_second"] is not None:
+            location = {'subregion': agent_feature[agent]["city_second"]}
             result.update(ir(location, info, asset_type))
         recommend_agent_asset[agent] = sorted(result, key=result.get, reverse=True)
 
@@ -1061,7 +1064,7 @@ def get_asset_agent_matrix():
     for asset in assets_now:
         result = {}
         for agent in agent_feature:
-            if asset not in agent_asset[agent] and agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']:
+            if (agent in agent_asset and asset not in agent_asset[agent]) and (agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']):
                 result[agent] = 0
                 if assets_now[asset]['type'] == 7 or agent_feature[agent]['type'] == assets_now[asset]['type']:
                     result[agent] = result[agent] + 1
