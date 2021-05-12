@@ -2,15 +2,12 @@
 import datetime
 import json
 import math
+import os
 import re
 import time
 from math import sqrt
-import threading
-import time
+
 import joblib
-import os
-
-
 # external lib
 from flask import request, jsonify
 from influxdb import InfluxDBClient
@@ -22,10 +19,9 @@ import appdir.porter as porter
 # flask env
 from appdir import application
 from appdir.config import Config
-from appdir.models import Asset, User, Agent
+from appdir.models import Asset, User
 
 # MySQL
-from appdir.thread import myThread
 
 server = SSHTunnelForwarder(
     ('101.32.220.109', 22),
@@ -148,6 +144,7 @@ second = 0
 third = 0
 forth = 0
 
+
 # init
 @application.route('/')
 def init():
@@ -212,7 +209,8 @@ def getaction():
     result = client.query(query)
     for table in result:
         for record in table:
-            d = {'location': json.loads(record['location']), 'info': json.loads(record['info']), 'asset_type': int(record['asset_type'])}
+            d = {'location': json.loads(record['location']), 'info': json.loads(record['info']),
+                 'asset_type': int(record['asset_type'])}
             if record['user'] not in search:
                 search[int(record['user'])] = []
             search[int(record['user'])].append(d)
@@ -330,10 +328,14 @@ def getasset():
         if len(assets_all[asset]['details']) > 0:
             for t in assets_all[asset]['details']:
                 fi = assets_all[asset]['details'][t]
-                assets_all[asset]['details'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
+                assets_all[asset]['details'][t] = (fi * (1 + k) / fi + k * (
+                            (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
+                                                                                    2)
             for t in assets_all[asset]['title']:
                 fi = assets_all[asset]['title'][t]
-                assets_all[asset]['title'][t] = (fi * (1 + k) / fi + k * ((1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
+                assets_all[asset]['title'][t] = (fi * (1 + k) / fi + k * (
+                            (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
+                                                                                    2)
         if assets_all[asset]['state'] == 2:
             assets_now[asset] = assets_all[asset]
     global area_sort
@@ -481,8 +483,6 @@ def minmax(dic):
         for n in dic:
             dic[n] = (dic[n] - min) / (max - min)
     return dic
-
-
 
 
 def get_user_matrix():
@@ -855,7 +855,8 @@ def get_user_asset_matrix():
         # user - user
         similar_user[user] = {}
         for user2 in user_feature:
-            if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
+            if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2][
+                "city_first"] == user_feature[user]["city_second"]:
                 similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
 
     for user in user_feature:
@@ -868,7 +869,8 @@ def get_user_asset_matrix():
                         if user not in popularity_user or asset not in popularity_user[user]:
                             if asset not in prefer:
                                 prefer[asset] = 0
-                            prefer[asset] = prefer[asset] + (similar_user[user][user2] + 1) * user_interest[user2][asset]
+                            prefer[asset] = prefer[asset] + (similar_user[user][user2] + 1) * user_interest[user2][
+                                asset]
         for asset in prefer:
             if asset in assets_now:
                 rec[asset] = prefer[asset]
@@ -935,12 +937,14 @@ def get_agent_matrix():
     for agent in preference_agent:
         if agent not in matrix:
             matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
-                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
+                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {},
+                             'asset_type': {'buy': 0, 'rent': 0}}
         matrix = analysis_preference(matrix, preference_agent, agent, 1000)
     for agent in agent_asset:
         if agent not in matrix:
             matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
-                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
+                             'bathroom': {}, 'year': {}, 'garage': {}, 'description': {},
+                             'asset_type': {'buy': 0, 'rent': 0}}
         for asset in agent_asset[agent]:
             matrix = analysis_asset(matrix, asset, agent, 100)
 
@@ -948,7 +952,8 @@ def get_agent_matrix():
         agent_feature[agent] = {}
         if len(matrix[agent]['asset_type']) > 0:
             for asset_type in matrix[agent]['asset_type']:
-                matrix[agent]['asset_type'][asset_type] = matrix[agent]['asset_type'][asset_type] / matrix[agent]['time']
+                matrix[agent]['asset_type'][asset_type] = matrix[agent]['asset_type'][asset_type] / matrix[agent][
+                    'time']
             asset_type_sort = sorted(matrix[agent]['asset_type'], key=matrix[agent]['asset_type'].get, reverse=True)
             agent_feature[agent]["asset_type"] = asset_type_sort[0]
         if len(matrix[agent]['subregion']) > 0:
@@ -1064,7 +1069,9 @@ def get_asset_agent_matrix():
     for asset in assets_now:
         result = {}
         for agent in agent_feature:
-            if (agent in agent_asset and asset not in agent_asset[agent]) and (agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']):
+            if (agent in agent_asset and asset not in agent_asset[agent]) and (
+                    agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent][
+                'city_second'] == assets_now[asset]['subregion']):
                 result[agent] = 0
                 if assets_now[asset]['type'] == 7 or agent_feature[agent]['type'] == assets_now[asset]['type']:
                     result[agent] = result[agent] + 1
