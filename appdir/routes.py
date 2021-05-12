@@ -1209,15 +1209,23 @@ def retrieval():
     location = None
     info = None
     asset_type = 1
+    length = 20
     if request.method == "POST":
         location = json.loads(request.form.get('location'))
         info = json.loads(request.form.get('info'))
         asset_type = int(request.form.get('asset_type'))
+        length = request.form.get('length')
+        if length == "":
+            length = 20
+        else:
+            length = int(length)
     result = ir(location, info, asset_type)
+    if len(result) < length:
+        length = len(result)
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": sorted(result, key=result.get, reverse=True)
+        "data": sorted(result, key=result.get, reverse=True)[0:length]
     })
 
 
@@ -1317,12 +1325,10 @@ def ir(location, info, asset_type):
                 res = 0
                 if 'details' in info:
                     if len(assets_now[asset]['details']) > 0:
-                        print(assets_now[asset]['details'])
                         for q in query:
                             if q in assets_now[asset]['details']:
                                 res = res + assets_now[asset]['details'][q]
                     if len(assets_now[asset]['title']) > 0:
-                        print(assets_now[asset]['title'])
                         for q in query:
                             if q in assets_now[asset]['title']:
                                 res = res + (assets_now[asset]['title'][q]) * 2
