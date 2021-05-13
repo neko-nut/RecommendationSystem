@@ -145,12 +145,13 @@ third = 0
 forth = 0
 
 
+
 # init
 @application.route('/')
 def init():
     getaction()
     print('getaction', datetime.datetime.now())
-    getasset()
+    get_asset()
     print('getasset', datetime.datetime.now())
     get_user()
     print('getuserinfo', datetime.datetime.now())
@@ -221,11 +222,11 @@ def getaction():
     })
 
 
-def getasset():
+def get_asset():
     # assets
     global assets_all
     global assets_now
-    assets = session.query(Asset).all()
+    assets = session.query(Asset.asset_id, Asset.asset_info, Asset.asset_location, Asset.asset_agent, Asset.asset_type, Asset.asset_status, Asset.asset_open, Asset.asset_title).filter().all()
     global area_min
     global area_max
     global price_min
@@ -431,7 +432,7 @@ def get_user():
     global popularity
     global user_new
     global preference_user
-    users = session.query(User).all()
+    users = session.query(User.user_id, User.user_role, User.user_favorites, User.user_preference, User.user_reg_datetime).all()
     for user in users:
         if user.user_role == 1:
             preference_agent[user.user_id] = user.user_preference
