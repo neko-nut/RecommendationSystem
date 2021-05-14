@@ -158,8 +158,6 @@ def init():
     print('getpopularity', datetime.datetime.now())
     get_user_matrix()
     print('get_user_matrix', datetime.datetime.now())
-    for i in user_feature:
-        print(i)
     get_user_asset_matrix()
     print('get_user_asset_matrix', datetime.datetime.now())
     get_agent_matrix()
