@@ -429,8 +429,10 @@ def wordsanalysis(words):
 
 def get_user():
     global popularity
+    global popularity_user
     global user_new
     global preference_user
+    global preference_agent
     users = session.query(User.user_id, User.user_role, User.user_favorites, User.user_preference, User.user_reg_datetime).all()
     for user in users:
         if user.user_role == 1:
@@ -487,7 +489,7 @@ def minmax(dic):
 
 def get_user_matrix():
     """
-    1. region
+    1. subregion
     2. type
     3. area
     4. price
@@ -507,7 +509,7 @@ def get_user_matrix():
 
     for user in search:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'region': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
                             'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         for record in search[user]:
             matrix[user]['time'] = matrix[user]['time'] + search_worth
@@ -518,10 +520,10 @@ def get_user_matrix():
                     matrix[user]['asset_type']['rent'] = matrix[user]['asset_type']['rent'] + search_worth
 
             if 'location' in record:
-                if 'region' in record['location']:
-                    if record['location']['region'] not in matrix[user]['region']:
-                        matrix[user]['region'][record['location']['region']] = 0
-                    matrix[user]['region'][record['location']['region']] = matrix[user]['region'][record['location']['region']] + search_worth
+                if 'subregion' in record['location']:
+                    if record['location']['subregion'] not in matrix[user]['subregion']:
+                        matrix[user]['subregion'][record['location']['subregion']] = 0
+                    matrix[user]['subregion'][record['location']['subregion']] = matrix[user]['subregion'][record['location']['subregion']] + search_worth
             if 'info' in record:
                 if 'type' in record['info']:
                     if record['info']['type'] not in matrix[user]['type']:
@@ -572,7 +574,7 @@ def get_user_matrix():
 
     for user in actions_user:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'region': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
                             'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         for asset in actions_user[user]:
             matrix = analysis_asset(matrix, asset, user, actions_user[user][asset])
@@ -585,7 +587,7 @@ def get_user_matrix():
 
     for user in user_new:
         if user not in matrix:
-            matrix[user] = {'time': 0, 'region': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
+            matrix[user] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {}, 'bathroom': {},
                             'year': {}, 'garage': {}, 'description': {}, 'asset_type': {'buy': 0, 'rent': 0}}
         matrix = analysis_preference(matrix, preference_user, user, preference_worth)
 
@@ -598,12 +600,12 @@ def get_user_matrix():
             asset_type_sort = sorted(matrix[user]['asset_type'], key=matrix[user]['asset_type'].get, reverse=True)
             user_feature[user]["asset_type"] = asset_type_sort[0]
 
-        if len(matrix[user]['region']) > 0:
-            for city in matrix[user]['region']:
-                matrix[user]['region'][city] = matrix[user]['region'][city] / matrix[user]['time']
-            city_sort = sorted(matrix[user]['region'], key=matrix[user]['region'].get, reverse=True)
+        if len(matrix[user]['subregion']) > 0:
+            for city in matrix[user]['subregion']:
+                matrix[user]['subregion'][city] = matrix[user]['subregion'][city] / matrix[user]['time']
+            city_sort = sorted(matrix[user]['subregion'], key=matrix[user]['subregion'].get, reverse=True)
             user_feature[user]["city_first"] = city_sort[0]
-            if len(city_sort) > 1 and matrix[user]['region'][city_sort[1]] > 0.1:
+            if len(city_sort) > 1 and matrix[user]['subregion'][city_sort[1]] > 0.1:
                 user_feature[user]["city_second"] = city_sort[1]
             else:
                 user_feature[user]["city_second"] = None
@@ -723,9 +725,9 @@ def analysis_preference(matrix, preference, user, time):
             matrix[user]['type'][t] = matrix[user]['type'][t] + time
 
     if 'location' in preference[user]:
-        if preference[user]['location'] not in matrix[user]['region']:
-            matrix[user]['region'][preference[user]['location']] = 0
-        matrix[user]['region'][preference[user]['location']] = matrix[user]['region'][preference[user]['location']] + time
+        if preference[user]['location'] not in matrix[user]['subregion']:
+            matrix[user]['subregion'][preference[user]['location']] = 0
+        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][preference[user]['location']] + time
 
     if 'area_range' in preference[user]:
         min = getstate(area_sort, preference[user]['area_range'][0], 'area')
@@ -777,10 +779,10 @@ def analysis_asset(matrix, asset, user, time):
         else:
             matrix[user]['asset_type']['rent'] = matrix[user]['asset_type']['rent'] + time
 
-    if 'region' in assets_all[asset]:
-        if assets_all[asset]['region'] not in matrix[user]['region']:
-            matrix[user]['region'][assets_all[asset]['region']] = 0
-        matrix[user]['region'][assets_all[asset]['region']] = matrix[user]['region'][assets_all[asset]['region']] + time
+    if 'subregion' in assets_all[asset]:
+        if assets_all[asset]['subregion'] not in matrix[user]['subregion']:
+            matrix[user]['subregion'][assets_all[asset]['subregion']] = 0
+        matrix[user]['subregion'][assets_all[asset]['subregion']] = matrix[user]['subregion'][assets_all[asset]['subregion']] + time
 
     if assets_all[asset]['type'] not in matrix[user]['type']:
         matrix[user]['type'][assets_all[asset]['type']] = 0
@@ -870,7 +872,7 @@ def get_user_asset_matrix():
         recommend_user_asset[user] = sorted(rec, key=rec.get, reverse=True)
 
         asset_type = user_feature[user]["asset_type"]
-        location = {'region': user_feature[user]["city_first"]}
+        location = {'subregion': user_feature[user]["city_first"]}
         info = {'type': [user_feature[user]["type"]],
                 'area': area_list[user_feature[user]["area"] * 2],
                 'price': price_list[user_feature[user]["price"] * 2],
@@ -884,7 +886,7 @@ def get_user_asset_matrix():
         for asset in result:
             result[asset] = result[asset] * 1.2
         if user_feature[user]["city_second"] is not None:
-            location = {'region': user_feature[user]["city_second"]}
+            location = {'subregion': user_feature[user]["city_second"]}
             result.update(ir(location, info, asset_type))
         res = sorted(result, key=result.get, reverse=True)
         for id in res:
@@ -927,13 +929,13 @@ def get_agent_matrix():
     matrix = {}
     for agent in preference_agent:
         if agent not in matrix:
-            matrix[agent] = {'time': 0, 'region': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
+            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
                              'bathroom': {}, 'year': {}, 'garage': {}, 'description': {},
                              'asset_type': {'buy': 0, 'rent': 0}}
         matrix = analysis_preference(matrix, preference_agent, agent, 1000)
     for agent in agent_asset:
         if agent not in matrix:
-            matrix[agent] = {'time': 0, 'region': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
+            matrix[agent] = {'time': 0, 'subregion': {}, 'type': {}, 'area': {}, 'price': {}, 'room': {},
                              'bathroom': {}, 'year': {}, 'garage': {}, 'description': {},
                              'asset_type': {'buy': 0, 'rent': 0}}
         for asset in agent_asset[agent]:
@@ -947,12 +949,12 @@ def get_agent_matrix():
                     'time']
             asset_type_sort = sorted(matrix[agent]['asset_type'], key=matrix[agent]['asset_type'].get, reverse=True)
             agent_feature[agent]["asset_type"] = asset_type_sort[0]
-        if len(matrix[agent]['region']) > 0:
-            for city in matrix[agent]['region']:
-                matrix[agent]['region'][city] = matrix[agent]['region'][city] / matrix[agent]['time']
-            city_sort = sorted(matrix[agent]['region'], key=matrix[agent]['region'].get, reverse=True)
+        if len(matrix[agent]['subregion']) > 0:
+            for city in matrix[agent]['subregion']:
+                matrix[agent]['subregion'][city] = matrix[agent]['subregion'][city] / matrix[agent]['time']
+            city_sort = sorted(matrix[agent]['subregion'], key=matrix[agent]['subregion'].get, reverse=True)
             agent_feature[agent]["city_first"] = city_sort[0]
-            if len(city_sort) > 1 and matrix[agent]['region'][city_sort[1]] > 0.1:
+            if len(city_sort) > 1 and matrix[agent]['subregion'][city_sort[1]] > 0.1:
                 agent_feature[agent]["city_second"] = city_sort[1]
             else:
                 agent_feature[agent]["city_second"] = None
@@ -1037,7 +1039,7 @@ def get_user_agent_matrix():
 def get_agent_asset_matrix():
     for agent in agent_feature:
         asset_type = agent_feature[agent]['asset_type']
-        location = {'region': agent_feature[agent]["city_first"]}
+        location = {'subregion': agent_feature[agent]["city_first"]}
         info = {'type': [agent_feature[agent]["type"]],
                 'area': area_list[agent_feature[agent]["area"] * 2],
                 'price': price_list[agent_feature[agent]["price"] * 2],
@@ -1051,7 +1053,7 @@ def get_agent_asset_matrix():
         for asset in result:
             result[asset] = result[asset] * 1.2
         if agent_feature[agent]["city_second"] is not None:
-            location = {'region': agent_feature[agent]["city_second"]}
+            location = {'subregion': agent_feature[agent]["city_second"]}
             result.update(ir(location, info, asset_type))
         recommend_agent_asset[agent] = sorted(result, key=result.get, reverse=True)
 
@@ -1061,8 +1063,8 @@ def get_asset_agent_matrix():
         result = {}
         for agent in agent_feature:
             if (agent in agent_asset and asset not in agent_asset[agent]) and (
-                    agent_feature[agent]['city_first'] == assets_now[asset]['region'] or agent_feature[agent][
-                'city_second'] == assets_now[asset]['region']):
+                    agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent][
+                'city_second'] == assets_now[asset]['subregion']):
                 result[agent] = 0
                 if assets_now[asset]['type'] == 7 or agent_feature[agent]['type'] == assets_now[asset]['type']:
                     result[agent] = result[agent] + 1
@@ -1296,7 +1298,7 @@ def ir(location, info, asset_type):
     time_max = 0
     time_min = 2147483647
     for asset in assets_now:
-        if location['region'] == assets_now[asset]['region'] and assets_now[asset]['asset_type'] == asset_type:
+        if location['subregion'] == assets_now[asset]['subregion'] and assets_now[asset]['asset_type'] == asset_type:
             result[asset] = {'distance': 0.0, 'match': 0, 'details': 0, 'time': 0, 'pop': 0}
             if 'longitude' in location and 'latitude' in location:
                 result[asset]['distance'] = sqrt(pow((location['longitude'] - assets_now[asset]['longitude']), 2) +
