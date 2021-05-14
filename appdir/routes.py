@@ -145,7 +145,6 @@ third = 0
 forth = 0
 
 
-
 # init
 @application.route('/')
 def init():
@@ -159,6 +158,8 @@ def init():
     print('getpopularity', datetime.datetime.now())
     get_user_matrix()
     print('get_user_matrix', datetime.datetime.now())
+    for i in user_feature:
+        print(i)
     get_user_asset_matrix()
     print('get_user_asset_matrix', datetime.datetime.now())
     get_agent_matrix()
@@ -330,13 +331,13 @@ def get_asset():
             for t in assets_all[asset]['details']:
                 fi = assets_all[asset]['details'][t]
                 assets_all[asset]['details'][t] = (fi * (1 + k) / fi + k * (
-                            (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
-                                                                                    2)
+                        (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
+                                                                                2)
             for t in assets_all[asset]['title']:
                 fi = assets_all[asset]['title'][t]
                 assets_all[asset]['title'][t] = (fi * (1 + k) / fi + k * (
-                            (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
-                                                                                    2)
+                        (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
+                                                                                2)
         if assets_all[asset]['state'] == 2:
             assets_now[asset] = assets_all[asset]
     global area_sort
@@ -729,8 +730,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'location' in preference[user]:
         if preference[user]['location'] not in matrix[user]['subregion']:
             matrix[user]['subregion'][preference[user]['location']] = 0
-        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][
-                                                                      preference[user]['location']] + time
+        matrix[user]['subregion'][preference[user]['location']] = matrix[user]['subregion'][preference[user]['location']] + time
 
     if 'area_range' in preference[user]:
         min = getstate(area_sort, preference[user]['area_range'][0], 'area')
@@ -751,8 +751,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'room_num_range' in preference[user]:
         if preference[user]['room_num_range'][0] not in matrix[user]['room']:
             matrix[user]['room'][preference[user]['room_num_range'][0]] = 0
-        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][
-                                                                          preference[user]['room_num_range'][0]] + time
+        matrix[user]['room'][preference[user]['room_num_range'][0]] = matrix[user]['room'][preference[user]['room_num_range'][0]] + time
 
     if 'bathroom_num_range' in preference[user]:
         if preference[user]['bathroom_num_range'][0] not in matrix[user]['bathroom']:
@@ -771,9 +770,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'garage_num_range' in preference[user]:
         if preference[user]['garage_num_range'][0] not in matrix[user]['garage']:
             matrix[user]['garage'][preference[user]['garage_num_range'][0]] = 0
-        matrix[user]['garage'][preference[user]['garage_num_range'][0]] = matrix[user]['garage'][
-                                                                              preference[user]['garage_num_range'][
-                                                                                  0]] + time
+        matrix[user]['garage'][preference[user]['garage_num_range'][0]] = matrix[user]['garage'][preference[user]['garage_num_range'][0]] + time
     return matrix
 
 
@@ -856,8 +853,7 @@ def get_user_asset_matrix():
         # user - user
         similar_user[user] = {}
         for user2 in user_feature:
-            if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2][
-                "city_first"] == user_feature[user]["city_second"]:
+            if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
                 similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
 
     for user in user_feature:
@@ -1101,31 +1097,43 @@ def get_asset_agent_matrix():
 @application.route('/recommend', methods=['GET', 'POST'])
 def recommend():
     user = 0
-    matrix = joblib.load(Config.user_asset)
+    length = 20
     if request.method == "POST":
         user = int(request.form.get('user'))
+        if length == "":
+            length = 20
+        else:
+            length = int(length)
+    matrix = joblib.load(Config.user_asset)
+    if len(matrix[user]) < length:
+        length = len(matrix[user])
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": matrix[user]
+        "data": matrix[user][0:length]
     })
 
 
 @application.route('/getrelevantassets', methods=['GET', 'POST'])
 def get_asset_asset():
     asset = 0
+    length = 20
     if request.method == "POST":
         asset = int(request.form.get('asset'))
+        if length == "":
+            length = 20
+        else:
+            length = int(length)
     location = {
-        'longitude': assets_now[asset]['longitude'],
-        'latitude': assets_now[asset]['latitude'],
-        'region': assets_now[asset]['region'],
-        'subregion': assets_now[asset]['subregion'],
-        'street': assets_now[asset]['street']
+        'longitude': assets_all[asset]['longitude'],
+        'latitude': assets_all[asset]['latitude'],
+        'region': assets_all[asset]['region'],
+        'subregion': assets_all[asset]['subregion'],
+        'street': assets_all[asset]['street']
     }
     area_range = [2147483647, 0]
     for range in area_list:
-        if area_list[range][1] > assets_now[asset]['area'] > area_list[range][0]:
+        if area_list[range][1] > assets_all[asset]['area'] > area_list[range][0]:
             if area_range[0] > area_list[range][0]:
                 area_range[0] = area_list[range][0]
             if area_range[1] < area_list[range][1]:
@@ -1133,7 +1141,7 @@ def get_asset_asset():
 
     price_range = [2147483647, 0]
     for range in price_list:
-        if price_list[range][1] > assets_now[asset]['price'] > price_list[range][0]:
+        if price_list[range][1] > assets_all[asset]['price'] > price_list[range][0]:
             if price_range[0] > price_list[range][0]:
                 price_range[0] = price_list[range][0]
             if price_range[1] < price_list[range][1]:
@@ -1141,74 +1149,96 @@ def get_asset_asset():
 
     year_range = [2147483647, 0]
     for range in year_list:
-        if year_list[range][1] > assets_now[asset]['area'] > year_list[range][0]:
+        if year_list[range][1] > assets_all[asset]['area'] > year_list[range][0]:
             if year_range[0] > year_list[range][0]:
                 year_range[0] = year_list[range][0]
             if year_range[1] < year_list[range][1]:
                 year_range[1] = year_list[range][1]
 
     info = {
-        'type': [assets_now[asset]['type']],
+        'type': [assets_all[asset]['type']],
         'area': area_range,
         'price': price_range,
-        'room': assets_now[asset]['room'],
-        'bathroom': assets_now[asset]['bathroom'],
-        'garage': assets_now[asset]['garage'],
+        'room': assets_all[asset]['room'],
+        'bathroom': assets_all[asset]['bathroom'],
+        'garage': assets_all[asset]['garage'],
         'year_built': year_range,
-        'description': assets_now[asset]['details']
+        'description': assets_all[asset]['details']
     }
-    result = ir(location, info, assets_now[asset]['asset_type'])
+    result = ir(location, info, assets_all[asset]['asset_type'])
+    if len(result) < length:
+        length = len(result)
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": sorted(result, key=result.get, reverse=True)
+        "data": sorted(result, key=result.get, reverse=True)[0:length]
     })
 
 
 @application.route('/recommendagenttouser', methods=['GET', 'POST'])
 def recommend_agent_to_user():
     user = 0
+    length = 20
     if request.method == "POST":
         user = int(request.form.get('user'))
+        if length == "":
+            length = 20
+        else:
+            length = int(length)
     matrix = joblib.load(Config.user_agent)
+    if len(matrix[user]) < length:
+        length = len(matrix[user])
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": matrix[user]
+        "data": matrix[user][0:length]
     })
-
 
 @application.route('/recommendassettoagent', methods=['GET', 'POST'])
 def recommend_asset_to_agent():
     agent = 0
+    length = 20
     if request.method == "POST":
         agent = int(request.form.get('agent'))
+        if length == "":
+            length = 20
+        else:
+            length = int(length)
     matrix = joblib.load(Config.asset_agent)
+    if len(matrix[agent]) < length:
+        length = len(matrix[agent])
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": matrix[agent]
+        "data": matrix[agent][0:length]
     })
 
 
 @application.route('/recommendagenttoasset', methods=['GET', 'POST'])
 def recommend_agent_to_asset():
     asset = 0
+    length = 20
     if request.method == "POST":
         asset = int(request.form.get('asset'))
+        if length == "":
+            length = 20
+        else:
+            length = int(length)
     matrix = joblib.load(Config.agent_asset)
+    if len(matrix[asset]) < length:
+        length = len(matrix[asset])
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": matrix[asset]
+        "data": matrix[asset][0:length]
     })
 
 
 @application.route('/retrieval', methods=['GET', 'POST'])
 def retrieval():
     # get data
-    location = None
-    info = None
+    location = []
+    info = []
     asset_type = 1
     length = 20
     if request.method == "POST":
@@ -1223,6 +1253,9 @@ def retrieval():
     result = ir(location, info, asset_type)
     if len(result) < length:
         length = len(result)
+    res = sorted(result, key=result.get, reverse=True)[0:length]
+    for i in res:
+        print(assets_now[i])
     return jsonify({
         "code": 200,
         "msg": "OK",
