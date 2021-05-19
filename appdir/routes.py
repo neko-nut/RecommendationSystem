@@ -191,30 +191,33 @@ def getaction():
     global actions_user
     query = "SELECT * FROM browse WHERE time >= " + str(time.time_ns() - 31536000000000000)
     result = client.query(query)
+    act = {}
+    act_u = {}
     for table in result:
         for record in table:
             if int(record['user']) != 1017:
-                if int(record['user']) not in actions_user:
-                    actions_user[int(record['user'])] = {}
-                if int(record['asset']) not in actions_user[int(record['user'])]:
-                    actions_user[int(record['user'])][int(record['asset'])] = 0
-                actions_user[int(record['user'])][int(record['asset'])] = actions_user[int(record['user'])][
-                                                                              int(record['asset'])] + record['duration']
-                if int(record['asset']) not in actions:
-                    actions[int(record['asset'])] = 0
-                actions[int(record['asset'])] = actions[int(record['asset'])] + record['duration']
-
+                if int(record['user']) not in act_u:
+                    act_u[int(record['user'])] = {}
+                if int(record['asset']) not in act_u[int(record['user'])]:
+                    act_u[int(record['user'])][int(record['asset'])] = 0
+                act_u[int(record['user'])][int(record['asset'])] = act_u[int(record['user'])][int(record['asset'])] + record['duration']
+                if int(record['asset']) not in act:
+                    act[int(record['asset'])] = 0
+                act[int(record['asset'])] = act[int(record['asset'])] + record['duration']
+    actions_user = act_u
+    actions = act
     global search
     query = "SELECT * FROM search WHERE time >= " + str(time.time_ns() - 31536000000000000)
     result = client.query(query)
+    s = {}
     for table in result:
         for record in table:
             d = {'location': json.loads(record['location']), 'info': json.loads(record['info']),
                  'asset_type': int(record['asset_type'])}
-            if record['user'] not in search:
-                search[int(record['user'])] = []
-            search[int(record['user'])].append(d)
-
+            if record['user'] not in s:
+                s[int(record['user'])] = []
+            s[int(record['user'])].append(d)
+    search = s
     return jsonify({
         "code": 200,
         "msg": "OK"
@@ -233,9 +236,17 @@ def get_asset():
     global year_min
     global year_max
 
+    area_min = 2147483647
+    area_max = 0
+    price_min = 2147483647
+    price_max = 0
+    year_min = 2147483647
+    year_max = 0
+
     # BM25
     global cache
     global n
+    n = {}
     l = len(assets)
     len_sum = 0
     k = 1
@@ -329,15 +340,19 @@ def get_asset():
             for t in assets_all[asset]['details']:
                 fi = assets_all[asset]['details'][t]
                 assets_all[asset]['details'][t] = (fi * (1 + k) / fi + k * (
-                        (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
-                                                                                2)
+                        (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
             for t in assets_all[asset]['title']:
                 fi = assets_all[asset]['title'][t]
                 assets_all[asset]['title'][t] = (fi * (1 + k) / fi + k * (
-                        (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)),
-                                                                                2)
+                        (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
         if assets_all[asset]['state'] == 2:
             assets_now[asset] = assets_all[asset]
+    #
+
+    # global assets_all
+    # global assets_now
+    # assets_all = joblib.load(Config.asset_all)
+    # assets_now = joblib.load(Config.asset_now)
     global area_sort
     global price_sort
     global year_sort
@@ -433,18 +448,20 @@ def get_user():
     global user_new
     global preference_user
     global preference_agent
+    pop = {}
     users = session.query(User.user_id, User.user_role, User.user_favorites, User.user_preference, User.user_reg_datetime).all()
     for user in users:
         if user.user_role == 1:
             preference_agent[user.user_id] = user.user_preference
         for asset in user.user_favorites:
-            if asset not in popularity:
-                popularity[asset] = 0
-            popularity[asset] = popularity[asset] + 1
+            if asset not in pop:
+                pop[asset] = 0
+            pop[asset] = pop[asset] + 1
         popularity_user[user.user_id] = user.user_favorites
         preference_user[user.user_id] = user.user_preference
         if user.user_reg_datetime > datetime.datetime.now() - datetime.timedelta(days=30):
             user_new.add(user.user_id)
+    popularity = pop
     return jsonify({
         "code": 200,
         "msg": "OK"
