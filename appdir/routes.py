@@ -1298,7 +1298,7 @@ def ir(location, info, asset_type):
     time_max = 0
     time_min = 2147483647
     for asset in assets_now:
-        if location['subregion'] == assets_now[asset]['subregion'] and assets_now[asset]['asset_type'] == asset_type:
+        if location['subregion'] == assets_now[asset]['subregion'] and (assets_now[asset]['asset_type'] == asset_type or asset_type == 0):
             result[asset] = {'distance': 0.0, 'match': 0, 'details': 0, 'time': 0, 'pop': 0}
             if 'longitude' in location and 'latitude' in location:
                 result[asset]['distance'] = sqrt(pow((location['longitude'] - assets_now[asset]['longitude']), 2) +
