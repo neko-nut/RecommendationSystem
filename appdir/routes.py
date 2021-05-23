@@ -417,7 +417,6 @@ def get_asset():
         7: [(year_sort[third][1]["year"] + year_sort[forth][1]["year"]) / 2,
             (year_sort[forth][1]["year"] + len(assets_all)) / 2],
         8: [year_sort[third][1]["year"], len(assets_all)]}
-
     return jsonify({
         "code": 200,
         "msg": "OK"
@@ -1080,8 +1079,7 @@ def get_asset_agent_matrix():
         result = {}
         for agent in agent_feature:
             if (agent in agent_asset and asset not in agent_asset[agent]) and (
-                    agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent][
-                'city_second'] == assets_now[asset]['subregion']):
+                    agent_feature[agent]['city_first'] == assets_now[asset]['subregion'] or agent_feature[agent]['city_second'] == assets_now[asset]['subregion']):
                 result[agent] = 0
                 if assets_now[asset]['type'] == 7 or agent_feature[agent]['type'] == assets_now[asset]['type']:
                     result[agent] = result[agent] + 1
@@ -1104,7 +1102,7 @@ def get_asset_agent_matrix():
                 if year_list[agent_feature[agent]['year']][1] > assets_now[asset]['year'] > \
                         price_list[agent_feature[agent]['year']][0]:
                     result[agent] = result[agent] + 1
-        recommend_asset_agent[asset] = sorted(result, key=result.get)
+        recommend_asset_agent[asset] = sorted(result, key=result.get, reverse=True)
 
 
 @application.route('/recommend', methods=['GET', 'POST'])
@@ -1118,6 +1116,32 @@ def recommend():
         else:
             length = int(length)
     matrix = joblib.load(Config.user_asset)
+    if user not in matrix:
+        users = session.query(User.user_preference).filter(User.user_id == user).all()
+        print(users)
+        location = {'subregion': users[0].user_preference['location']}
+        if users[0].user_preference['buy_house']:
+            asset_type = 1
+        else:
+            asset_type = 2
+        info = {'type': users[0].user_preference['asset_types'],
+                'area': users[0].user_preference['area_range'],
+                'price': users[0].user_preference["price_range"],
+                'room': users[0].user_preference["room_num_range"][0],
+                'bathroom': users[0].user_preference["bathroom_num_range"][0],
+                'garage': users[0].user_preference["garage_num_range"][0],
+                'year_built': users[0].user_preference["built_year_range"]
+                # 'description': string
+                }
+        result = ir(location, info, asset_type)
+        result = sorted(result, key=result.get, reverse=True)
+        if len(result) < length:
+            length = len(result)
+        return jsonify({
+            "code": 200,
+            "msg": "OK",
+            "data": result[0:length]
+        })
     if len(matrix[user]) < length:
         length = len(matrix[user])
     return jsonify({
