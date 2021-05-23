@@ -886,8 +886,11 @@ def get_user_asset_matrix():
                 if assets_now[asset]['time'] > datetime.datetime.now() - datetime.timedelta(days=30):
                     rec[asset] = rec[asset] * 1.2
         recommend_user_asset[user] = sorted(rec, key=rec.get, reverse=True)
-
         asset_type = user_feature[user]["asset_type"]
+        if asset_type == 'buy':
+            asset_type = 1
+        else:
+            asset_type = 2
         location = {'subregion': user_feature[user]["city_first"]}
         info = {'type': [user_feature[user]["type"]],
                 'area': area_list[user_feature[user]["area"] * 2],
