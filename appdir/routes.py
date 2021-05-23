@@ -102,6 +102,7 @@ popularity_value = {}
 preference_user = {}
 preference_agent = {}
 user_new = set()
+agent_list = []
 # user: {asset: value, ...}
 rec_list = {}
 # user: {city: city, type: type, ...}
@@ -347,12 +348,7 @@ def get_asset():
                         (1 - b) + (b * doclen[asset]) / avg_doclen)) * math.log(((l - n[t] + 0.5) / (n[t] + 0.5)), 2)
         if assets_all[asset]['state'] == 2:
             assets_now[asset] = assets_all[asset]
-    #
 
-    # global assets_all
-    # global assets_now
-    # assets_all = joblib.load(Config.asset_all)
-    # assets_now = joblib.load(Config.asset_now)
     global area_sort
     global price_sort
     global year_sort
@@ -447,11 +443,14 @@ def get_user():
     global user_new
     global preference_user
     global preference_agent
+    global agent_list
     pop = {}
+    age = []
     users = session.query(User.user_id, User.user_role, User.user_favorites, User.user_preference, User.user_reg_datetime).all()
     for user in users:
         if user.user_role == 1:
             preference_agent[user.user_id] = user.user_preference
+            age.append(user.user_id)
         for asset in user.user_favorites:
             if asset not in pop:
                 pop[asset] = 0
@@ -461,12 +460,14 @@ def get_user():
         if user.user_reg_datetime > datetime.datetime.now() - datetime.timedelta(days=30):
             user_new.add(user.user_id)
     popularity = pop
+    agent_list = age
     return jsonify({
         "code": 200,
         "msg": "OK"
     })
 
 
+@application.route('/pop')
 def getpopularity():
     global popularity_value
     pop_nom = minmax(popularity)
@@ -868,6 +869,7 @@ def get_user_asset_matrix():
             if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
                 similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
 
+
     for user in user_feature:
         prefer = {}
         rec = {}
@@ -1121,7 +1123,6 @@ def recommend():
     matrix = joblib.load(Config.user_asset)
     if user not in matrix:
         users = session.query(User.user_preference).filter(User.user_id == user).all()
-        print(users)
         location = {'subregion': users[0].user_preference['location']}
         if users[0].user_preference['buy_house']:
             asset_type = 1
@@ -1164,48 +1165,95 @@ def get_asset_asset():
             length = 20
         else:
             length = int(length)
-    location = {
-        'longitude': assets_all[asset]['longitude'],
-        'latitude': assets_all[asset]['latitude'],
-        'region': assets_all[asset]['region'],
-        'subregion': assets_all[asset]['subregion'],
-        'street': assets_all[asset]['street']
-    }
-    area_range = [2147483647, 0]
-    for range in area_list:
-        if area_list[range][1] > assets_all[asset]['area'] > area_list[range][0]:
-            if area_range[0] > area_list[range][0]:
-                area_range[0] = area_list[range][0]
-            if area_range[1] < area_list[range][1]:
-                area_range[1] = area_list[range][1]
+    if asset in assets_all:
+        location = {
+            'longitude': assets_all[asset]['longitude'],
+            'latitude': assets_all[asset]['latitude'],
+            'region': assets_all[asset]['region'],
+            'subregion': assets_all[asset]['subregion'],
+            'street': assets_all[asset]['street']
+        }
+        area_range = [2147483647, 0]
+        for range in area_list:
+            if area_list[range][1] > assets_all[asset]['area'] > area_list[range][0]:
+                if area_range[0] > area_list[range][0]:
+                    area_range[0] = area_list[range][0]
+                if area_range[1] < area_list[range][1]:
+                    area_range[1] = area_list[range][1]
 
-    price_range = [2147483647, 0]
-    for range in price_list:
-        if price_list[range][1] > assets_all[asset]['price'] > price_list[range][0]:
-            if price_range[0] > price_list[range][0]:
-                price_range[0] = price_list[range][0]
-            if price_range[1] < price_list[range][1]:
-                price_range[1] = price_list[range][1]
+        price_range = [2147483647, 0]
+        for range in price_list:
+            if price_list[range][1] > assets_all[asset]['price'] > price_list[range][0]:
+                if price_range[0] > price_list[range][0]:
+                    price_range[0] = price_list[range][0]
+                if price_range[1] < price_list[range][1]:
+                    price_range[1] = price_list[range][1]
 
-    year_range = [2147483647, 0]
-    for range in year_list:
-        if year_list[range][1] > assets_all[asset]['area'] > year_list[range][0]:
-            if year_range[0] > year_list[range][0]:
-                year_range[0] = year_list[range][0]
-            if year_range[1] < year_list[range][1]:
-                year_range[1] = year_list[range][1]
+        year_range = [2147483647, 0]
+        for range in year_list:
+            if year_list[range][1] > assets_all[asset]['area'] > year_list[range][0]:
+                if year_range[0] > year_list[range][0]:
+                    year_range[0] = year_list[range][0]
+                if year_range[1] < year_list[range][1]:
+                    year_range[1] = year_list[range][1]
 
-    info = {
-        'type': [assets_all[asset]['type']],
-        'area': area_range,
-        'price': price_range,
-        'room': assets_all[asset]['room'],
-        'bathroom': assets_all[asset]['bathroom'],
-        'garage': assets_all[asset]['garage'],
-        'year_built': year_range,
-        'description': assets_all[asset]['details']
-    }
-    result = ir(location, info, assets_all[asset]['asset_type'])
+        info = {
+            'type': [assets_all[asset]['type']],
+            'area': area_range,
+            'price': price_range,
+            'room': assets_all[asset]['room'],
+            'bathroom': assets_all[asset]['bathroom'],
+            'garage': assets_all[asset]['garage'],
+            'year_built': year_range,
+            'description': assets_all[asset]['details']
+        }
+        result = ir(location, info, assets_all[asset]['asset_type'])
+    else:
+        assets = session.query(Asset.asset_info, Asset.asset_location, Asset.asset_type, Asset.asset_title).filter(
+            Asset.asset_id == asset).all()
+        location = {
+            'longitude': assets[0].asset_location['features'][0]['geometry']['coordinates'][0],
+            'latitude': assets[0].asset_location['features'][0]['geometry']['coordinates'][1],
+            'region': assets[0].asset_location['features'][0]['properties']['region'],
+            'subregion': assets[0].asset_location['features'][0]['properties']['subregion'],
+            'street': assets[0].asset_location['features'][0]['properties']['street']
+        }
+        area_range = [2147483647, 0]
+        for range in area_list:
+            if area_list[range][1] > assets[0].asset_info['area'] > area_list[range][0]:
+                if area_range[0] > area_list[range][0]:
+                    area_range[0] = area_list[range][0]
+                if area_range[1] < area_list[range][1]:
+                    area_range[1] = area_list[range][1]
+
+        price_range = [2147483647, 0]
+        for range in price_list:
+            if price_list[range][1] > assets[0].asset_info['price'] > price_list[range][0]:
+                if price_range[0] > price_list[range][0]:
+                    price_range[0] = price_list[range][0]
+                if price_range[1] < price_list[range][1]:
+                    price_range[1] = price_list[range][1]
+
+        year_range = [2147483647, 0]
+        for range in year_list:
+            if year_list[range][1] > assets[0].asset_info['year_built'] > year_list[range][0]:
+                if year_range[0] > year_list[range][0]:
+                    year_range[0] = year_list[range][0]
+                if year_range[1] < year_list[range][1]:
+                    year_range[1] = year_list[range][1]
+
+        info = {
+            'type': [assets_all[asset]['type']],
+            'area': area_range,
+            'price': price_range,
+            'room': int(assets[0].asset_info['room']),
+            'bathroom': int(assets[0].asset_info['bathroom']),
+            'garage': int(assets[0].asset_info['garage']),
+            'year_built': year_range,
+            'description': assets[0].asset_info['details']
+        }
+        result = ir(location, info, assets[0].asset_type)
+
     if len(result) < length:
         length = len(result)
     return jsonify({
@@ -1226,12 +1274,14 @@ def recommend_agent_to_user():
         else:
             length = int(length)
     matrix = joblib.load(Config.user_agent)
-    if len(matrix[user]) < length:
-        length = len(matrix[user])
+    agents = []
+    if user in matrix:
+        agents = matrix[user]
+    agents.append(agent_list)
     return jsonify({
         "code": 200,
         "msg": "OK",
-        "data": matrix[user][0:length]
+        "data": agents[0:length]
     })
 
 @application.route('/recommendassettoagent', methods=['GET', 'POST'])
@@ -1293,9 +1343,6 @@ def retrieval():
     result = ir(location, info, asset_type)
     if len(result) < length:
         length = len(result)
-    res = sorted(result, key=result.get, reverse=True)[0:length]
-    for i in res:
-        print(assets_now[i])
     return jsonify({
         "code": 200,
         "msg": "OK",
