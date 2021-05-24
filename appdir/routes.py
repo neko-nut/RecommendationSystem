@@ -283,37 +283,37 @@ def get_asset():
         dic['garage'] = 0
         dic['year'] = 0
 
-        if 'type' in asset.asset_info:
+        if 'type' in asset.asset_info and asset.asset_info['type'] is not None:
             dic['type'] = int(asset.asset_info['type'])
 
-        if 'area' in asset.asset_info:
+        if 'area' in asset.asset_info and asset.asset_info['area'] is not None:
             if int(asset.asset_info['area']) > area_max:
                 area_max = int(asset.asset_info['area'])
             elif int(asset.asset_info['area']) < area_min:
                 area_min = int(asset.asset_info['area'])
             dic['area'] = int(asset.asset_info['area'])
 
-        if 'price' in asset.asset_info:
+        if 'price' in asset.asset_info and asset.asset_info['price'] is not None:
             if int(asset.asset_info['price']) > price_max:
                 price_max = int(asset.asset_info['price'])
             elif int(asset.asset_info['price']) < price_min:
                 price_min = int(asset.asset_info['price'])
             dic['price'] = int(asset.asset_info['price'])
 
-        if 'year_built' in asset.asset_info:
+        if 'year_built' in asset.asset_info and asset.asset_info['year_built'] is not None:
             if int(asset.asset_info['year_built']) > year_max:
                 year_max = int(asset.asset_info['year_built'])
             elif int(asset.asset_info['year_built']) < year_min:
                 year_min = int(asset.asset_info['year_built'])
             dic['year'] = int(asset.asset_info['year_built'])
 
-        if 'room' in asset.asset_info:
+        if 'room' in asset.asset_info and asset.asset_info['room'] is not None:
             dic['room'] = int(asset.asset_info['room'])
 
-        if 'bathroom' in asset.asset_info:
+        if 'bathroom' in asset.asset_info and asset.asset_info['bathroom'] is not None:
             dic['bathroom'] = int(asset.asset_info['bathroom'])
 
-        if 'garage' in asset.asset_info:
+        if 'garage' in asset.asset_info and asset.asset_info['garage'] is not None:
             dic['garage'] = int(asset.asset_info['garage'])
 
         dic['time'] = asset.asset_open
@@ -448,10 +448,9 @@ def get_user():
     age = []
     users = session.query(User.user_id, User.user_role, User.user_favorites, User.user_preference, User.user_reg_datetime).all()
     for user in users:
-        if user.user_id != 1038:
-            if user.user_role == 1:
-                preference_agent[user.user_id] = user.user_preference
-                age.append(user.user_id)
+        if user.user_role == 1:
+            preference_agent[user.user_id] = user.user_preference
+            age.append(user.user_id)
         for asset in user.user_favorites:
             if asset not in pop:
                 pop[asset] = 0
@@ -537,18 +536,18 @@ def get_user_matrix():
                 else:
                     matrix[user]['asset_type']['rent'] = matrix[user]['asset_type']['rent'] + search_worth
 
-            if 'location' in record:
+            if 'location' in record and record['location'] is not None:
                 if 'subregion' in record['location']:
                     if record['location']['subregion'] not in matrix[user]['subregion']:
                         matrix[user]['subregion'][record['location']['subregion']] = 0
                     matrix[user]['subregion'][record['location']['subregion']] = matrix[user]['subregion'][record['location']['subregion']] + search_worth
-            if 'info' in record:
-                if 'type' in record['info']:
+            if 'info' in record and record['location'] is not None:
+                if 'type' in record['info'] and record['info']['type'] is not None:
                     if record['info']['type'] not in matrix[user]['type']:
                         matrix[user]['type'][record['info']['type']] = 0
                     matrix[user]['type'][record['info']['type']] = matrix[user]['type'][record['info']['type']] + search_worth
 
-                if 'area' in record['info']:
+                if 'area' in record['info'] and record['info']['area'] is not None:
                     min = getstate(area_sort, record['info']['area'][0], 'area')
                     max = getstate(area_sort, record['info']['area'][1], 'area')
                     for i in range(min, max+1):
@@ -556,7 +555,7 @@ def get_user_matrix():
                             matrix[user]['area'][i] = 0
                         matrix[user]['area'][i] = matrix[user]['area'][i] + search_worth
 
-                if 'price' in record['info']:
+                if 'price' in record['info'] and record['info']['price'] is not None:
                     min = getstate(area_sort, record['info']['price'][0], 'price')
                     max = getstate(area_sort, record['info']['price'][1], 'price')
                     for i in range(min, max+1):
@@ -564,19 +563,18 @@ def get_user_matrix():
                             matrix[user]['price'][i] = 0
                         matrix[user]['price'][i] = matrix[user]['price'][i] + search_worth
 
-                if 'room' in record['info']:
+                if 'room' in record['info'] and record['info']['room'] is not None:
                     if record['info']['room'] not in matrix[user]['room']:
                         matrix[user]['room'][record['info']['room']] = 0
-                    matrix[user]['room'][record['info']['room']] = matrix[user]['room'][
-                                                                       record['info']['room']] + search_worth
+                    matrix[user]['room'][record['info']['room']] = matrix[user]['room'][record['info']['room']] + search_worth
 
-                if 'bathroom' in record['info']:
+                if 'bathroom' in record['info'] and record['info']['bathroom'] is not None:
                     if record['info']['bathroom'] not in matrix[user]['bathroom']:
                         matrix[user]['bathroom'][record['info']['bathroom']] = 0
                     matrix[user]['bathroom'][record['info']['bathroom']] = matrix[user]['bathroom'][record['info'][
                         'bathroom']] + search_worth
 
-                if 'year' in record['info']:
+                if 'year' in record['info'] and record['info']['year'] is not None:
                     min = getstate(area_sort, record['info']['year'][0], 'price')
                     max = getstate(area_sort, record['info']['year'][1], 'price')
                     for i in range(min, max+1):
@@ -584,11 +582,10 @@ def get_user_matrix():
                             matrix[user]['year'][i] = 0
                         matrix[user]['year'][i] = matrix[user]['year'][i] + search_worth
 
-                if 'garage' in record['info']:
+                if 'garage' in record['info'] and record['info']['garage'] is not None:
                     if record['info']['garage'] not in matrix[user]['garage']:
                         matrix[user]['garage'][record['info']['garage']] = 0
-                    matrix[user]['garage'][record['info']['garage']] = matrix[user]['garage'][
-                                                                           record['info']['garage']] + search_worth
+                    matrix[user]['garage'][record['info']['garage']] = matrix[user]['garage'][record['info']['garage']] + search_worth
 
     for user in actions_user:
         if user not in matrix:
@@ -822,8 +819,7 @@ def analysis_asset(matrix, asset, user, time):
 
     if assets_all[asset]['bathroom'] not in matrix[user]['bathroom']:
         matrix[user]['bathroom'][assets_all[asset]['bathroom']] = 0
-    matrix[user]['bathroom'][assets_all[asset]['bathroom']] = matrix[user]['bathroom'][
-                                                                  assets_all[asset]['bathroom']] + time
+    matrix[user]['bathroom'][assets_all[asset]['bathroom']] = matrix[user]['bathroom'][assets_all[asset]['bathroom']] + time
 
     year_state = getstate(year_sort, assets_all[asset]['year'], 'year')
     if year_state not in matrix[user]['year']:
@@ -968,8 +964,7 @@ def get_agent_matrix():
         agent_feature[agent] = {}
         if len(matrix[agent]['asset_type']) > 0:
             for asset_type in matrix[agent]['asset_type']:
-                matrix[agent]['asset_type'][asset_type] = matrix[agent]['asset_type'][asset_type] / matrix[agent][
-                    'time']
+                matrix[agent]['asset_type'][asset_type] = matrix[agent]['asset_type'][asset_type] / matrix[agent]['time']
             asset_type_sort = sorted(matrix[agent]['asset_type'], key=matrix[agent]['asset_type'].get, reverse=True)
             agent_feature[agent]["asset_type"] = asset_type_sort[0]
         if len(matrix[agent]['subregion']) > 0:
@@ -1126,7 +1121,6 @@ def recommend():
     if user not in matrix:
         session.commit()
         users = session.query(User.user_id, User.user_preference).filter(User.user_id == user).all()
-        use = session.query(User.user_id, User.user_preference).filter(User.user_id == 1039).all()
         location = {'subregion': users[0].user_preference['location']}
         if users[0].user_preference['buy_house']:
             asset_type = 1
