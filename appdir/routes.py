@@ -448,9 +448,10 @@ def get_user():
     age = []
     users = session.query(User.user_id, User.user_role, User.user_favorites, User.user_preference, User.user_reg_datetime).all()
     for user in users:
-        if user.user_role == 1:
-            preference_agent[user.user_id] = user.user_preference
-            age.append(user.user_id)
+        if user.user_id != 1038:
+            if user.user_role == 1:
+                preference_agent[user.user_id] = user.user_preference
+                age.append(user.user_id)
         for asset in user.user_favorites:
             if asset not in pop:
                 pop[asset] = 0
@@ -550,15 +551,15 @@ def get_user_matrix():
                 if 'area' in record['info']:
                     min = getstate(area_sort, record['info']['area'][0], 'area')
                     max = getstate(area_sort, record['info']['area'][1], 'area')
-                    for i in range(min, max):
+                    for i in range(min, max+1):
                         if i not in matrix[user]['area']:
                             matrix[user]['area'][i] = 0
                         matrix[user]['area'][i] = matrix[user]['area'][i] + search_worth
 
                 if 'price' in record['info']:
-                    min = getstate(area_sort, record['info']['area'][0], 'price')
-                    max = getstate(area_sort, record['info']['area'][1], 'price')
-                    for i in range(min, max):
+                    min = getstate(area_sort, record['info']['price'][0], 'price')
+                    max = getstate(area_sort, record['info']['price'][1], 'price')
+                    for i in range(min, max+1):
                         if i not in matrix[user]['price']:
                             matrix[user]['price'][i] = 0
                         matrix[user]['price'][i] = matrix[user]['price'][i] + search_worth
@@ -578,7 +579,7 @@ def get_user_matrix():
                 if 'year' in record['info']:
                     min = getstate(area_sort, record['info']['year'][0], 'price')
                     max = getstate(area_sort, record['info']['year'][1], 'price')
-                    for i in range(min, max):
+                    for i in range(min, max+1):
                         if i not in matrix[user]['year']:
                             matrix[user]['year'][i] = 0
                         matrix[user]['year'][i] = matrix[user]['year'][i] + search_worth
@@ -749,7 +750,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'area_range' in preference[user]:
         min = getstate(area_sort, preference[user]['area_range'][0], 'area')
         max = getstate(area_sort, preference[user]['area_range'][1], 'area')
-        for i in range(min, max):
+        for i in range(min, max+1):
             if i not in matrix[user]['area']:
                 matrix[user]['area'][i] = 0
             matrix[user]['area'][i] = matrix[user]['area'][i] + time
@@ -757,7 +758,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'price_range' in preference[user]:
         min = getstate(price_sort, preference[user]['price_range'][0], 'price')
         max = getstate(price_sort, preference[user]['price_range'][1], 'price')
-        for i in range(min, max):
+        for i in range(min, max+1):
             if i not in matrix[user]['price']:
                 matrix[user]['price'][i] = 0
             matrix[user]['price'][i] = matrix[user]['price'][i] + time
@@ -776,7 +777,7 @@ def analysis_preference(matrix, preference, user, time):
     if 'built_year_range' in preference[user]:
         min = getstate(year_sort, preference[user]['built_year_range'][0], 'year')
         max = getstate(year_sort, preference[user]['built_year_range'][1], 'year')
-        for i in range(min, max):
+        for i in range(min, max+1):
             if i not in matrix[user]['year']:
                 matrix[user]['year'][i] = 0
             matrix[user]['year'][i] = matrix[user]['year'][i] + time
@@ -868,6 +869,7 @@ def get_user_asset_matrix():
         for user2 in user_feature:
             if user_feature[user2]["city_first"] == user_feature[user]["city_first"] or user_feature[user2]["city_first"] == user_feature[user]["city_second"]:
                 similar_user[user][user2] = cos_sim_user(user_feature[user], user_feature[user2])
+
 
 
     for user in user_feature:
@@ -1122,7 +1124,9 @@ def recommend():
             length = int(length)
     matrix = joblib.load(Config.user_asset)
     if user not in matrix:
-        users = session.query(User.user_preference).filter(User.user_id == user).all()
+        session.commit()
+        users = session.query(User.user_id, User.user_preference).filter(User.user_id == user).all()
+        use = session.query(User.user_id, User.user_preference).filter(User.user_id == 1039).all()
         location = {'subregion': users[0].user_preference['location']}
         if users[0].user_preference['buy_house']:
             asset_type = 1
