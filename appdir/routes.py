@@ -1213,6 +1213,7 @@ def get_asset_asset():
         }
         result = ir(location, info, assets_all[asset]['asset_type'])
     else:
+        session.commit()
         assets = session.query(Asset.asset_info, Asset.asset_location, Asset.asset_type, Asset.asset_title).filter(
             Asset.asset_id == asset).all()
         location = {
