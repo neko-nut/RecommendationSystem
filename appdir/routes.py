@@ -1276,7 +1276,7 @@ def recommend_agent_to_user():
     agents = []
     if user in matrix:
         agents = matrix[user]
-    agents.append(agent_list)
+    agents = agents + agent_list
     return jsonify({
         "code": 200,
         "msg": "OK",
